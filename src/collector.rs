@@ -16,6 +16,11 @@ pub struct EventListOptions {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+pub struct IngestOptions {
+    pub require_signatures: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RunListOptions {
     pub limit: Option<u64>,
 }
@@ -67,6 +72,15 @@ impl CollectorStore {
     }
 
     pub fn ingest_events(&mut self, source: &str, events: &[Value]) -> Result<String> {
+        self.ingest_events_with_options(source, events, IngestOptions::default())
+    }
+
+    pub fn ingest_events_with_options(
+        &mut self,
+        source: &str,
+        events: &[Value],
+        options: IngestOptions,
+    ) -> Result<String> {
         if events.is_empty() {
             bail!("cannot ingest empty run");
         }
@@ -75,7 +89,7 @@ impl CollectorStore {
             .and_then(Value::as_str)
             .context("first event has no run_id")?
             .to_owned();
-        verify_events(events, false)?;
+        verify_events(events, options.require_signatures)?;
         let tx = self.connection.transaction()?;
         tx.execute(
             "INSERT OR REPLACE INTO runs (run_id, source, created_at) VALUES (?1, ?2, ?3)",
@@ -166,8 +180,16 @@ impl CollectorStore {
     }
 
     pub fn ingest_jsonl_file(&mut self, path: &Path) -> Result<String> {
+        self.ingest_jsonl_file_with_options(path, IngestOptions::default())
+    }
+
+    pub fn ingest_jsonl_file_with_options(
+        &mut self,
+        path: &Path,
+        options: IngestOptions,
+    ) -> Result<String> {
         let events = read_jsonl(path)?;
-        self.ingest_events(&path.display().to_string(), &events)
+        self.ingest_events_with_options(&path.display().to_string(), &events, options)
     }
 
     pub fn export_jsonl_file(&self, run_id: &str, path: &Path) -> Result<usize> {
@@ -542,7 +564,8 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
     let response = match (method, path) {
         ("POST", "/ingest") => {
             let events = parse_jsonl_body(body)?;
-            let run_id = store.ingest_events("http", &events)?;
+            let run_id =
+                store.ingest_events_with_options("http", &events, ingest_options(query)?)?;
             json_response(200, &json!({"run_id": run_id, "events": events.len()}))?
         }
         ("POST", path) if path.starts_with("/runs/") && path.ends_with("/events") => {
@@ -657,6 +680,12 @@ fn event_list_options(query: Option<&str>) -> Result<EventListOptions> {
         after_sequence: query_param_u64(query, "after_sequence")?,
         limit: query_param_u64(query, "limit")?,
         event_type: query_param_string(query, "event_type"),
+    })
+}
+
+fn ingest_options(query: Option<&str>) -> Result<IngestOptions> {
+    Ok(IngestOptions {
+        require_signatures: query_param_bool(query, "require_signatures")?.unwrap_or(false),
     })
 }
 
@@ -831,6 +860,22 @@ mod tests {
         );
         assert!(bad_ingest.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(bad_ingest.contains("previous_event_hash mismatch"));
+
+        let unsigned = serde_json::to_string(
+            &build_event_from_input(EventInput::new("run_unsigned_ingest", 1, "run.start"))
+                .unwrap(),
+        )
+        .unwrap();
+        let strict_ingest = http_response_for_request(
+            &format!(
+                "POST /ingest?require_signatures=true HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{}",
+                unsigned.len(),
+                unsigned
+            ),
+            &db,
+        );
+        assert!(strict_ingest.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(strict_ingest.contains("\"error\":\"missing signature at sequence 1\""));
 
         let bad_boolean = http_response_for_request(
             "GET /runs/run_missing/verify?require_signatures=yes HTTP/1.1\r\nHost: localhost\r\n\r\n",

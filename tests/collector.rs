@@ -1,6 +1,7 @@
-use agentprov::collector::{CollectorStore, EventListOptions, RunListOptions};
+use agentprov::collector::{CollectorStore, EventListOptions, IngestOptions, RunListOptions};
 use agentprov::event::{EventInput, build_event_from_input, event_hash};
 use agentprov::run_log::{AppendEventInput, append_event_to_run, read_jsonl, write_jsonl};
+use agentprov::signing::{generate_key, sign_value};
 use serde_json::json;
 use tempfile::tempdir;
 
@@ -78,6 +79,49 @@ fn collector_rejects_invalid_ingest_chains() {
         .unwrap_err()
         .to_string();
     assert!(missing.contains("run not found: run_invalid_ingest"));
+}
+
+#[test]
+fn collector_ingest_can_require_signatures() {
+    let mut store = CollectorStore::open_memory().unwrap();
+
+    let unsigned =
+        build_event_from_input(EventInput::new("run_unsigned_ingest", 1, "run.start")).unwrap();
+    let error = store
+        .ingest_events_with_options(
+            "test",
+            &[unsigned],
+            IngestOptions {
+                require_signatures: true,
+            },
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("missing signature at sequence 1"));
+
+    let key = generate_key();
+    let mut start =
+        build_event_from_input(EventInput::new("run_signed_ingest", 1, "run.start")).unwrap();
+    sign_value(&mut start, &key).unwrap();
+    let mut next = EventInput::new("run_signed_ingest", 2, "tool.execute");
+    next.previous_event_hash = Some(start["event_hash"].as_str().unwrap().to_owned());
+    let mut next = build_event_from_input(next).unwrap();
+    sign_value(&mut next, &key).unwrap();
+
+    let run_id = store
+        .ingest_events_with_options(
+            "test",
+            &[start, next],
+            IngestOptions {
+                require_signatures: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(run_id, "run_signed_ingest");
+    assert_eq!(
+        store.verify_run("run_signed_ingest", true).unwrap()["events"],
+        2
+    );
 }
 
 #[test]

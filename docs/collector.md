@@ -11,6 +11,7 @@ Ingest a run log:
 
 ```bash
 agentprov collector ingest runs/run_123.jsonl --db agentprov.sqlite
+agentprov collector ingest runs/run_123.jsonl --db agentprov.sqlite --require-signatures
 ```
 
 List runs:
@@ -58,7 +59,12 @@ agentprov collector serve --addr 127.0.0.1:8787 --db agentprov.sqlite
 `POST /ingest`
 
 Request body: AgentProv JSONL events. The collector verifies the event chain
-before storing the run.
+before storing the run. Optional `require_signatures=true` rejects any unsigned
+event:
+
+```text
+POST /ingest?require_signatures=true
+```
 
 Response:
 

@@ -144,6 +144,7 @@ Use the local collector:
 
 ```bash
 cargo run -- collector ingest demo-output/run.jsonl --db agentprov.sqlite
+cargo run -- collector ingest demo-output/run.jsonl --db agentprov.sqlite --require-signatures
 cargo run -- collector runs --db agentprov.sqlite
 cargo run -- collector runs --db agentprov.sqlite --limit 25
 cargo run -- collector events run_demo_manual_tool --db agentprov.sqlite

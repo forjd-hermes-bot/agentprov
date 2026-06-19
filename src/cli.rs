@@ -1,4 +1,4 @@
-use crate::collector::{CollectorStore, EventListOptions, RunListOptions, serve};
+use crate::collector::{CollectorStore, EventListOptions, IngestOptions, RunListOptions, serve};
 use crate::event::{build_event, event_hash, verify_event_hash};
 use crate::export::{to_openinference_span, to_otel_span};
 use crate::integrations::{import_claude_jsonl, import_codex_jsonl};
@@ -273,6 +273,8 @@ enum CollectorCommand {
         file: PathBuf,
         #[arg(long)]
         db: PathBuf,
+        #[arg(long)]
+        require_signatures: bool,
     },
     Runs {
         #[arg(long)]
@@ -837,9 +839,14 @@ fn handle_validate(kind: ValidateKind, file: PathBuf) -> Result<()> {
 
 fn handle_collector(command: CollectorCommand) -> Result<()> {
     match command {
-        CollectorCommand::Ingest { file, db } => {
+        CollectorCommand::Ingest {
+            file,
+            db,
+            require_signatures,
+        } => {
             let mut store = CollectorStore::open(&db)?;
-            let run_id = store.ingest_jsonl_file(&file)?;
+            let run_id = store
+                .ingest_jsonl_file_with_options(&file, IngestOptions { require_signatures })?;
             println!("ingested run {run_id}");
             Ok(())
         }

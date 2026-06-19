@@ -303,6 +303,54 @@ fn collector_runs_supports_limit() {
 }
 
 #[test]
+fn collector_ingest_can_require_signatures() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+    let db = dir.path().join("collector.sqlite");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "ingest",
+            run.to_str().unwrap(),
+            "--db",
+            db.to_str().unwrap(),
+            "--require-signatures",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing signature at sequence 1"));
+
+    let output = Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["collector", "runs", "--db", db.to_str().unwrap()])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["count"], 0);
+    assert!(value["runs"].as_array().unwrap().is_empty());
+}
+
+#[test]
 fn collector_export_writes_stored_run_as_jsonl() {
     let dir = tempdir().unwrap();
     let run = dir.path().join("run.jsonl");
