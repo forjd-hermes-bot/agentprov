@@ -298,6 +298,12 @@ enum CollectorCommand {
         #[arg(long = "type")]
         event_type: Option<String>,
     },
+    Event {
+        run_id: String,
+        sequence: u64,
+        #[arg(long)]
+        db: PathBuf,
+    },
     Export {
         run_id: String,
         #[arg(long)]
@@ -879,6 +885,14 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
                     event_type,
                 },
             )?)
+        }
+        CollectorCommand::Event {
+            run_id,
+            sequence,
+            db,
+        } => {
+            let store = CollectorStore::open(&db)?;
+            print_json(&store.run_event(&run_id, sequence)?)
         }
         CollectorCommand::Export { run_id, db, out } => {
             let store = CollectorStore::open(&db)?;

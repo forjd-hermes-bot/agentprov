@@ -331,6 +331,24 @@ impl CollectorStore {
         Ok(events)
     }
 
+    pub fn run_event(&self, run_id: &str, sequence: u64) -> Result<Value> {
+        if !self.run_exists(run_id)? {
+            bail!("run not found: {run_id}");
+        }
+        let sequence = i64::try_from(sequence).context("sequence is too large for SQLite")?;
+        let event_json: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT event_json FROM events WHERE run_id = ?1 AND sequence = ?2",
+                params![run_id, sequence],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let event_json =
+            event_json.with_context(|| format!("event not found: {run_id} sequence {sequence}"))?;
+        serde_json::from_str(&event_json).context("parse stored event JSON")
+    }
+
     pub fn run_events_page(&self, run_id: &str, options: EventListOptions) -> Result<Vec<Value>> {
         if !self.run_exists(run_id)? {
             bail!("run not found: {run_id}");
@@ -653,6 +671,10 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
                 &store.run_events_json(run_id, event_list_options(query)?)?,
             )?
         }
+        ("GET", path) if path.starts_with("/runs/") && path.contains("/events/") => {
+            let (run_id, sequence) = run_event_path(path)?;
+            json_response(200, &store.run_event(run_id, sequence)?)?
+        }
         ("GET", path) if path.starts_with("/runs/") && path.ends_with("/export") => {
             let run_id = path
                 .trim_start_matches("/runs/")
@@ -686,7 +708,7 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
 
 fn http_error_status(error: &anyhow::Error) -> u16 {
     let message = error.to_string();
-    if message.starts_with("run not found:") {
+    if message.starts_with("run not found:") || message.starts_with("event not found:") {
         404
     } else if is_bad_request_error(&message) {
         400
@@ -698,6 +720,8 @@ fn http_error_status(error: &anyhow::Error) -> u16 {
 fn is_bad_request_error(message: &str) -> bool {
     message.starts_with("parse ")
         || message.starts_with("missing HTTP ")
+        || message.starts_with("event path must ")
+        || message.starts_with("sequence must ")
         || message.starts_with("request body ")
         || message.contains(" must ")
         || message.contains(" mismatch")
@@ -755,6 +779,23 @@ fn event_list_options(query: Option<&str>) -> Result<EventListOptions> {
         limit: query_param_u64(query, "limit")?,
         event_type: query_param_string(query, "event_type"),
     })
+}
+
+fn run_event_path(path: &str) -> Result<(&str, u64)> {
+    let path = path.trim_start_matches("/runs/");
+    let (run_id, sequence) = path
+        .split_once("/events/")
+        .context("event path must include run_id and sequence")?;
+    if run_id.is_empty() || sequence.is_empty() || sequence.contains('/') {
+        bail!("event path must include run_id and sequence");
+    }
+    let sequence = sequence
+        .parse::<u64>()
+        .context("sequence must be an unsigned integer")?;
+    if sequence == 0 {
+        bail!("sequence must be greater than 0");
+    }
+    Ok((run_id, sequence))
 }
 
 fn append_options(query: Option<&str>) -> Result<AppendOptions> {
@@ -996,6 +1037,25 @@ mod tests {
         assert!(summary["event_types"].as_array().unwrap().iter().any(
             |event_type| event_type["event_type"] == "tool.execute" && event_type["count"] == 1
         ));
+
+        let event_response = http_response_for_request(
+            "GET /runs/run_http_filter/events/2 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(event_response.starts_with("HTTP/1.1 200 OK"));
+        let body = event_response.split("\r\n\r\n").nth(1).unwrap();
+        let event: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(event["sequence"], 2);
+        assert_eq!(event["event_type"], "tool.execute");
+
+        let missing_event = http_response_for_request(
+            "GET /runs/run_http_filter/events/99 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(missing_event.starts_with("HTTP/1.1 404 Not Found"));
+        assert!(
+            missing_event.contains("\"error\":\"event not found: run_http_filter sequence 99\"")
+        );
 
         let response = http_response_for_request(
             "GET /runs/run_http_filter/events?event_type=tool.execute&limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",

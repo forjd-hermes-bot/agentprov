@@ -246,6 +246,78 @@ fn collector_events_supports_sequence_bounds() {
 }
 
 #[test]
+fn collector_event_prints_one_sequence() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+    let db = dir.path().join("collector.sqlite");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "event",
+            "append",
+            "--run",
+            run.to_str().unwrap(),
+            "--type",
+            "tool.execute",
+            "--action",
+            "tool.first",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "ingest",
+            run.to_str().unwrap(),
+            "--db",
+            db.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let run_id = read_jsonl_fixture(&run)[0]["run_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let output = Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "event",
+            &run_id,
+            "2",
+            "--db",
+            db.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["sequence"], 2);
+    assert_eq!(value["event_type"], "tool.execute");
+    assert_eq!(value["action"], "tool.first");
+}
+
+#[test]
 fn collector_runs_supports_limit() {
     let dir = tempdir().unwrap();
     let db = dir.path().join("collector.sqlite");

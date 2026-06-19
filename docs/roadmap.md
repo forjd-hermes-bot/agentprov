@@ -152,6 +152,7 @@ Status: partial.
 - optional signature enforcement on streaming append
 - run listings include event counts
 - run summaries include event-type counts
+- direct event lookup by stable sequence
 - bounded run listing with `has_more`
 - bounded event listing by stable event sequence
 - event listing filtered by event type

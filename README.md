@@ -148,6 +148,7 @@ cargo run -- collector ingest demo-output/run.jsonl --db agentprov.sqlite --requ
 cargo run -- collector runs --db agentprov.sqlite
 cargo run -- collector runs --db agentprov.sqlite --limit 25
 cargo run -- collector run run_demo_manual_tool --db agentprov.sqlite
+cargo run -- collector event run_demo_manual_tool 2 --db agentprov.sqlite
 cargo run -- collector events run_demo_manual_tool --db agentprov.sqlite
 cargo run -- collector events run_demo_manual_tool --db agentprov.sqlite --after-sequence 100 --limit 50
 cargo run -- collector events run_demo_manual_tool --db agentprov.sqlite --type permission.check

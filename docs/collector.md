@@ -30,6 +30,7 @@ agentprov collector run run_123 --db agentprov.sqlite
 Read events for a run:
 
 ```bash
+agentprov collector event run_123 2 --db agentprov.sqlite
 agentprov collector events run_123 --db agentprov.sqlite
 agentprov collector events run_123 --db agentprov.sqlite --after-sequence 100 --limit 50
 agentprov collector events run_123 --db agentprov.sqlite --type permission.check
@@ -134,6 +135,14 @@ GET /runs/run_123/events?after_sequence=100&limit=50&event_type=permission.check
 
 Responses include `count`, `next_after_sequence`, and `has_more` metadata for
 client-side paging.
+
+`GET /runs/<run_id>/events/<sequence>`
+
+Returns one stored event by stable sequence:
+
+```text
+GET /runs/run_123/events/2
+```
 
 `GET /runs/<run_id>/export`
 

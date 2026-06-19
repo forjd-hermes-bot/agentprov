@@ -54,6 +54,7 @@ Implemented:
 - streaming append can require event signatures
 - collector run listings include event counts
 - collector run summaries include event-type counts
+- direct collector event lookup by sequence
 - bounded collector run listing with `has_more`
 - bounded collector event listing by event sequence
 - collector event filtering by event type
@@ -95,6 +96,7 @@ agentprov validate <manifest|run-envelope|event|policy> <file>
 agentprov collector ingest <jsonl> --db <db> [--require-signatures]
 agentprov collector runs --db <db> [--limit <n>]
 agentprov collector run <run_id> --db <db>
+agentprov collector event <run_id> <sequence> --db <db>
 agentprov collector events <run_id> --db <db> [--after-sequence <n>] [--limit <n>] [--type <event-type>]
 agentprov collector export <run_id> --db <db> --out <jsonl>
 agentprov collector verify <run_id> --db <db> [--require-signatures]
@@ -241,6 +243,7 @@ Completed:
 - optional signature enforcement on streaming append
 - collector run listings include event counts
 - collector run summaries include event-type counts
+- direct event lookup by stable sequence
 - bounded run listing with `has_more`
 - bounded event listing by stable event sequence
 - event listing filtered by event type

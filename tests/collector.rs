@@ -51,6 +51,15 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     assert_eq!(events.len(), 2);
     assert_eq!(events[1]["event_type"], "tool.execute");
 
+    let event = store.run_event("run_collector_test", 2).unwrap();
+    assert_eq!(event["sequence"], 2);
+    assert_eq!(event["event_type"], "tool.execute");
+    let missing_event = store
+        .run_event("run_collector_test", 3)
+        .unwrap_err()
+        .to_string();
+    assert!(missing_event.contains("event not found: run_collector_test sequence 3"));
+
     let report = store.verify_run("run_collector_test", false).unwrap();
     assert_eq!(report["verifies"], true);
     assert_eq!(report["events"], 2);
