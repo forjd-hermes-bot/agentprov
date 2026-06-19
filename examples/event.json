@@ -1,0 +1,19 @@
+{
+  "schema": "agentprov.dev/event/v1",
+  "event_id": "evt_01hxexample",
+  "run_id": "run_01hxexample",
+  "sequence": 1,
+  "timestamp": "2026-06-19T10:00:01Z",
+  "event_type": "permission.check",
+  "subject": {
+    "type": "agent",
+    "id": "agent_01hxexample"
+  },
+  "action": "discord.message.create",
+  "resource": "discord://guild/148756/channel/148756",
+  "payload_digest": "blake3:example-payload",
+  "previous_event_hash": null,
+  "event_hash": null,
+  "signature": null,
+  "key_id": "key_01hxexample"
+}

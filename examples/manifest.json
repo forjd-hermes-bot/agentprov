@@ -1,0 +1,30 @@
+{
+  "schema": "agentprov.dev/manifest/v1",
+  "agent_id": "agent_01hxexample",
+  "name": "research-agent",
+  "description": "Researches a topic and drafts a response",
+  "version": "0.1.0",
+  "owner": {
+    "type": "github_user",
+    "id": "danjdewhurst"
+  },
+  "source": {
+    "repo": "https://github.com/example/research-agent",
+    "commit": "abc123",
+    "image_digest": null
+  },
+  "runtime": {
+    "type": "cli",
+    "environment": "local"
+  },
+  "capabilities": [
+    "web.search",
+    "http.get",
+    "discord.message.create"
+  ],
+  "policy": {
+    "id": "policy_research_agent",
+    "version": "v1"
+  },
+  "public_key": null
+}

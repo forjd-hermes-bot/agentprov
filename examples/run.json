@@ -1,0 +1,34 @@
+{
+  "schema": "agentprov.dev/run-envelope/v1",
+  "run_id": "run_01hxexample",
+  "trace_id": "trace_01hxexample",
+  "parent_run_id": null,
+  "trigger": {
+    "type": "manual",
+    "id": "discord_message_123"
+  },
+  "agent": {
+    "agent_id": "agent_01hxexample",
+    "version": "0.1.0",
+    "manifest_digest": "blake3:example"
+  },
+  "actor_chain": [
+    { "type": "user", "id": "danjdewhurst", "auth_method": "discord" },
+    { "type": "service", "id": "hermes" },
+    { "type": "agent", "id": "agent_01hxexample" }
+  ],
+  "runtime": {
+    "host": "example-host",
+    "os": "linux",
+    "environment": "local",
+    "container_image_digest": null
+  },
+  "authority": {
+    "capabilities": ["web.search", "discord.message.create"],
+    "policy_id": "policy_research_agent",
+    "policy_version": "v1"
+  },
+  "started_at": "2026-06-19T10:00:00Z",
+  "ended_at": null,
+  "status": "running"
+}
