@@ -35,6 +35,23 @@ Event chain: valid
 Signatures: not present
 ```
 
+## Install
+
+From source:
+
+```bash
+cargo install --git https://github.com/forjd-hermes-bot/agentprov
+agentprov --version
+```
+
+For local development:
+
+```bash
+git clone https://github.com/forjd-hermes-bot/agentprov.git
+cd agentprov
+cargo run -- --version
+```
+
 ## Current CLI
 
 ```bash

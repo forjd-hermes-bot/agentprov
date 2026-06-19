@@ -21,9 +21,20 @@ fn manifest_example_prints_valid_json() {
 }
 
 #[test]
+fn version_flag_works() {
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("agentprov"));
+}
+
+#[test]
 fn event_hash_outputs_blake3_digest() {
-    let mut cmd = Command::cargo_bin("agentprov").unwrap();
-    cmd.args(["event", "hash", "examples/event.json"])
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["event", "hash", "examples/event.json"])
         .assert()
         .success()
         .stdout(predicate::str::starts_with("blake3:"));
@@ -137,7 +148,7 @@ fn run_verify_rejects_tampered_log() {
 }
 
 #[test]
-fn key_generation_signing_and_signature_verification_work() {
+fn key_generation_inspection_public_and_signature_verification_work() {
     let dir = tempdir().unwrap();
     let key = dir.path().join("agentprov.key");
     let signed = dir.path().join("event.signed.json");
@@ -147,6 +158,21 @@ fn key_generation_signing_and_signature_verification_work() {
         .args(["key", "generate", "--out", key.to_str().unwrap()])
         .assert()
         .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["key", "public", "--key", key.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("public_key"))
+        .stdout(predicate::str::contains("secret_key").not());
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["key", "inspect", "--key", key.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("has_secret_key"));
 
     Command::cargo_bin("agentprov")
         .unwrap()
@@ -168,10 +194,83 @@ fn key_generation_signing_and_signature_verification_work() {
         .assert()
         .success()
         .stdout(predicate::str::contains("ok: event signature verifies"));
+
+    let tampered = fs::read_to_string(&signed)
+        .unwrap()
+        .replace("permission.check", "permission.tampered");
+    fs::write(&signed, tampered).unwrap();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["event", "verify-signature", signed.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("signed hash mismatch"));
 }
 
 #[test]
-fn policy_check_returns_allow_decision() {
+fn signed_append_supports_require_signatures() {
+    let dir = tempdir().unwrap();
+    let key = dir.path().join("agentprov.key");
+    let run = dir.path().join("run.jsonl");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["key", "generate", "--out", key.to_str().unwrap()])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "event",
+            "append",
+            "--run",
+            run.to_str().unwrap(),
+            "--type",
+            "tool.execute",
+            "--action",
+            "demo",
+            "--resource",
+            "demo",
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "verify",
+            run.to_str().unwrap(),
+            "--require-signatures",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signatures: valid"));
+}
+
+#[test]
+fn policy_check_returns_allow_decision_and_can_emit_event() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+
     Command::cargo_bin("agentprov")
         .unwrap()
         .args([
@@ -189,6 +288,46 @@ fn policy_check_returns_allow_decision() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"decision\": \"allow\""));
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "policy",
+            "check",
+            "--policy",
+            "examples/policy.json",
+            "--agent",
+            "agent_01hxexample",
+            "--action",
+            "discord.message.create",
+            "--resource",
+            "discord://guild/148756/channel/456",
+            "--emit-event",
+            "--run",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["run", "verify", run.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Events: 2"));
 }
 
 #[test]
