@@ -143,6 +143,7 @@ Status: partial.
 
 - local HTTP ingest server
 - SQLite persistence
+- ingest-time event-chain verification
 - query API for runs/events
 - verification endpoint
 - HTTP JSONL export endpoint for stored runs

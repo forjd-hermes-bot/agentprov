@@ -2,7 +2,8 @@
 
 The local collector is an MVP ingest and query surface for AgentProv JSONL run
 logs. It stores original event JSON in SQLite and verifies stored runs with the
-same event-chain verifier used by `agentprov run verify`.
+same event-chain verifier used by `agentprov run verify`. Bulk ingest rejects
+run logs whose event chain does not verify.
 
 ## CLI
 
@@ -56,7 +57,8 @@ agentprov collector serve --addr 127.0.0.1:8787 --db agentprov.sqlite
 
 `POST /ingest`
 
-Request body: AgentProv JSONL events.
+Request body: AgentProv JSONL events. The collector verifies the event chain
+before storing the run.
 
 Response:
 

@@ -75,6 +75,7 @@ impl CollectorStore {
             .and_then(Value::as_str)
             .context("first event has no run_id")?
             .to_owned();
+        verify_events(events, false)?;
         let tx = self.connection.transaction()?;
         tx.execute(
             "INSERT OR REPLACE INTO runs (run_id, source, created_at) VALUES (?1, ?2, ?3)",
@@ -808,6 +809,28 @@ mod tests {
         );
         assert!(bad_json.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(bad_json.contains("\"error\":\"parse body line 1\""));
+
+        let first =
+            build_event_from_input(EventInput::new("run_bad_ingest", 1, "run.start")).unwrap();
+        let mut second = EventInput::new("run_bad_ingest", 2, "tool.execute");
+        second.previous_event_hash = Some("blake3:not-the-previous-event".to_owned());
+        let second = build_event_from_input(second).unwrap();
+        let invalid_chain = [first, second]
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<serde_json::Result<Vec<_>>>()
+            .unwrap()
+            .join("\n");
+        let bad_ingest = http_response_for_request(
+            &format!(
+                "POST /ingest HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{}",
+                invalid_chain.len(),
+                invalid_chain
+            ),
+            &db,
+        );
+        assert!(bad_ingest.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(bad_ingest.contains("previous_event_hash mismatch"));
 
         let bad_boolean = http_response_for_request(
             "GET /runs/run_missing/verify?require_signatures=yes HTTP/1.1\r\nHost: localhost\r\n\r\n",

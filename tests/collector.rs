@@ -58,6 +58,29 @@ fn collector_ingests_lists_reads_and_verifies_run() {
 }
 
 #[test]
+fn collector_rejects_invalid_ingest_chains() {
+    let mut store = CollectorStore::open_memory().unwrap();
+
+    let start =
+        build_event_from_input(EventInput::new("run_invalid_ingest", 1, "run.start")).unwrap();
+    let mut next = EventInput::new("run_invalid_ingest", 2, "tool.execute");
+    next.previous_event_hash = Some("blake3:not-the-previous-event".to_owned());
+    let next = build_event_from_input(next).unwrap();
+
+    let error = store
+        .ingest_events("test", &[start, next])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("previous_event_hash mismatch"));
+
+    let missing = store
+        .run_events("run_invalid_ingest")
+        .unwrap_err()
+        .to_string();
+    assert!(missing.contains("run not found: run_invalid_ingest"));
+}
+
+#[test]
 fn collector_appends_streamed_events_and_rejects_invalid_links() {
     let mut store = CollectorStore::open_memory().unwrap();
 

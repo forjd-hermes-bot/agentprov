@@ -48,6 +48,7 @@ Implemented:
 - local SQLite collector with CLI ingest, query, and verification commands
 - local HTTP collector endpoints for JSONL ingest, run listing, event lookup,
   JSONL export, and verification
+- collector ingest rejects invalid event chains
 - streaming HTTP collector endpoint for verified single-event appends
 - bounded collector run listing with `has_more`
 - bounded collector event listing by event sequence
@@ -225,6 +226,7 @@ Completed:
 
 - local HTTP ingest server
 - SQLite persistence
+- ingest-time event-chain verification
 - query API for runs and events
 - verification endpoint
 - import/export path between JSONL files and stored runs
