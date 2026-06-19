@@ -92,6 +92,20 @@ GET /runs/run_123/events?after_sequence=100&limit=50
 
 Runs event-chain verification for one stored run.
 
+## HTTP errors
+
+HTTP errors return JSON:
+
+```json
+{
+  "error": "run not found: run_123"
+}
+```
+
+The collector returns `400` for malformed JSON, invalid query parameters, and
+invalid event appends; `404` for missing routes or missing runs; and `500` for
+unexpected server failures.
+
 ## Limitations
 
 - The server is intentionally small and local-first.

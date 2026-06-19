@@ -391,7 +391,25 @@ pub fn serve(addr: &str, db: &Path) -> Result<()> {
 
 fn handle_connection(mut stream: TcpStream, db: &Path) -> Result<()> {
     let request = read_http_request(&mut stream)?;
-    let (head, body) = request.split_once("\r\n\r\n").unwrap_or((&request, ""));
+    let response = http_response_for_request(&request, db);
+    stream.write_all(response.as_bytes())?;
+    Ok(())
+}
+
+fn http_response_for_request(request: &str, db: &Path) -> String {
+    match route_http_request(request, db) {
+        Ok(response) => response,
+        Err(error) => {
+            let status = http_error_status(&error);
+            json_response(status, &json!({"error": error.to_string()})).unwrap_or_else(|_| {
+                "HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: 33\r\nConnection: close\r\n\r\n{\"error\":\"internal server error\"}".to_owned()
+            })
+        }
+    }
+}
+
+fn route_http_request(request: &str, db: &Path) -> Result<String> {
+    let (head, body) = request.split_once("\r\n\r\n").unwrap_or((request, ""));
     let mut lines = head.lines();
     let request_line = lines.next().context("missing HTTP request line")?;
     let mut parts = request_line.split_whitespace();
@@ -435,8 +453,30 @@ fn handle_connection(mut stream: TcpStream, db: &Path) -> Result<()> {
         _ => json_response(404, &json!({"error": "not found"}))?,
     };
 
-    stream.write_all(response.as_bytes())?;
-    Ok(())
+    Ok(response)
+}
+
+fn http_error_status(error: &anyhow::Error) -> u16 {
+    let message = error.to_string();
+    if message.starts_with("run not found:") {
+        404
+    } else if is_bad_request_error(&message) {
+        400
+    } else {
+        500
+    }
+}
+
+fn is_bad_request_error(message: &str) -> bool {
+    message.starts_with("parse ")
+        || message.starts_with("missing HTTP ")
+        || message.starts_with("request body ")
+        || message.contains(" must ")
+        || message.contains(" mismatch")
+        || message.contains(" does not match ")
+        || message.contains(" has no ")
+        || message.contains("schema validation failed")
+        || message.contains("event hash mismatch")
 }
 
 fn read_http_request(stream: &mut TcpStream) -> Result<String> {
@@ -529,7 +569,9 @@ fn parse_json_body(body: &str) -> Result<Value> {
 fn json_response(status: u16, value: &Value) -> Result<String> {
     let reason = match status {
         200 => "OK",
+        400 => "Bad Request",
         404 => "Not Found",
+        500 => "Internal Server Error",
         _ => "OK",
     };
     let body = serde_json::to_string(value)?;
@@ -546,4 +588,37 @@ fn escape_html(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn http_errors_are_returned_as_json_responses() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+
+        let bad_query = http_response_for_request(
+            "GET /runs/run_missing/events?limit=0 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(bad_query.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(bad_query.contains("\"error\":\"limit must be greater than 0\""));
+
+        let missing_run = http_response_for_request(
+            "GET /runs/run_missing/events HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(missing_run.starts_with("HTTP/1.1 404 Not Found"));
+        assert!(missing_run.contains("\"error\":\"run not found: run_missing\""));
+
+        let bad_json = http_response_for_request(
+            "POST /ingest HTTP/1.1\r\nHost: localhost\r\nContent-Length: 8\r\n\r\nnot-json",
+            &db,
+        );
+        assert!(bad_json.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(bad_json.contains("\"error\":\"parse body line 1\""));
+    }
 }

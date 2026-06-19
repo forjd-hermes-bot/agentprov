@@ -49,6 +49,7 @@ Implemented:
   verification
 - streaming HTTP collector endpoint for verified single-event appends
 - bounded collector event listing by event sequence
+- structured JSON errors for collector HTTP requests
 - static read-only collector dashboard export
 - trust semantics note for local signatures, manifest binding, run envelopes, and
   future trust roots
@@ -225,6 +226,7 @@ Completed:
 - import/export path between JSONL files and stored runs
 - streaming append endpoint for one verified event at a time
 - bounded event listing by stable event sequence
+- structured JSON error responses for malformed HTTP requests
 
 Future production work:
 
