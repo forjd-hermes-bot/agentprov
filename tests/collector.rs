@@ -283,7 +283,10 @@ fn collector_lists_bounded_run_pages() {
     }
 
     let page = store
-        .list_runs_json(RunListOptions { limit: Some(2) })
+        .list_runs_json(RunListOptions {
+            limit: Some(2),
+            source: None,
+        })
         .unwrap();
     assert_eq!(page["count"], 2);
     assert_eq!(page["limit"], 2);
@@ -295,6 +298,43 @@ fn collector_lists_bounded_run_pages() {
     let all = store.list_runs().unwrap();
     assert_eq!(all["count"], 3);
     assert_eq!(all["has_more"], false);
+}
+
+#[test]
+fn collector_filters_run_pages_by_source() {
+    let mut store = CollectorStore::open_memory().unwrap();
+
+    for (run_id, source) in [
+        ("run_source_one", "codex"),
+        ("run_source_two", "claude"),
+        ("run_source_three", "codex"),
+    ] {
+        let start = build_event_from_input(EventInput::new(run_id, 1, "run.start")).unwrap();
+        store.ingest_events(source, &[start]).unwrap();
+    }
+
+    let page = store
+        .list_runs_json(RunListOptions {
+            limit: Some(1),
+            source: Some("codex".to_owned()),
+        })
+        .unwrap();
+    assert_eq!(page["count"], 1);
+    assert_eq!(page["limit"], 1);
+    assert_eq!(page["source"], "codex");
+    assert_eq!(page["has_more"], true);
+    assert_eq!(page["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(page["runs"][0]["source"], "codex");
+
+    let empty = store
+        .list_runs_json(RunListOptions {
+            limit: None,
+            source: Some("missing".to_owned()),
+        })
+        .unwrap();
+    assert_eq!(empty["count"], 0);
+    assert_eq!(empty["source"], "missing");
+    assert_eq!(empty["has_more"], false);
 }
 
 #[test]

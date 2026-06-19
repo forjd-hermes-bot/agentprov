@@ -147,6 +147,7 @@ cargo run -- collector ingest demo-output/run.jsonl --db agentprov.sqlite
 cargo run -- collector ingest demo-output/run.jsonl --db agentprov.sqlite --require-signatures
 cargo run -- collector runs --db agentprov.sqlite
 cargo run -- collector runs --db agentprov.sqlite --limit 25
+cargo run -- collector runs --db agentprov.sqlite --source demo-output/run.jsonl
 cargo run -- collector run run_demo_manual_tool --db agentprov.sqlite
 cargo run -- collector event run_demo_manual_tool 2 --db agentprov.sqlite
 cargo run -- collector events run_demo_manual_tool --db agentprov.sqlite

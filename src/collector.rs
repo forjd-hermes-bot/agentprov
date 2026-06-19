@@ -25,9 +25,10 @@ pub struct IngestOptions {
     pub require_signatures: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RunListOptions {
     pub limit: Option<u64>,
+    pub source: Option<String>,
 }
 
 pub struct CollectorStore {
@@ -73,6 +74,8 @@ impl CollectorStore {
             );
             CREATE INDEX IF NOT EXISTS idx_collector_runs_created_at_run_id
                 ON runs(created_at DESC, run_id ASC);
+            CREATE INDEX IF NOT EXISTS idx_collector_runs_source_created_at_run_id
+                ON runs(source, created_at DESC, run_id ASC);
             CREATE INDEX IF NOT EXISTS idx_collector_events_run_type_sequence
                 ON events(run_id, event_type, sequence);
             "#,
@@ -233,7 +236,10 @@ impl CollectorStore {
     }
 
     pub fn list_runs_json(&self, options: RunListOptions) -> Result<Value> {
-        let mut runs = self.run_rows(options.limit.map(limit_plus_one).transpose()?)?;
+        let mut runs = self.run_rows(
+            options.limit.map(limit_plus_one).transpose()?,
+            options.source.as_deref(),
+        )?;
         let has_more = if let Some(limit) = options.limit {
             let limit_usize = usize::try_from(limit).context("limit is too large for usize")?;
             if runs.len() > limit_usize {
@@ -250,6 +256,7 @@ impl CollectorStore {
             "runs": runs,
             "count": count,
             "limit": options.limit,
+            "source": options.source,
             "has_more": has_more,
         }))
     }
@@ -282,17 +289,19 @@ impl CollectorStore {
         Ok(summary)
     }
 
-    fn run_rows(&self, limit: Option<i64>) -> Result<Vec<Value>> {
-        if let Some(limit) = limit {
+    fn run_rows(&self, limit: Option<i64>, source: Option<&str>) -> Result<Vec<Value>> {
+        let limit = limit.unwrap_or(-1);
+        if let Some(source) = source {
             let mut statement = self.connection.prepare(
                 "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence), \
                     MAX(events.sequence), \
                     (SELECT tip.event_hash FROM events tip WHERE tip.run_id = runs.run_id ORDER BY tip.sequence DESC LIMIT 1) \
                  FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
+                 WHERE runs.source = ?1 \
                  GROUP BY runs.run_id, runs.source, runs.created_at \
-                 ORDER BY runs.created_at DESC, runs.run_id ASC LIMIT ?1",
+                 ORDER BY runs.created_at DESC, runs.run_id ASC LIMIT ?2",
             )?;
-            let rows = statement.query_map(params![limit], |row| {
+            let rows = statement.query_map(params![source, limit], |row| {
                 Ok(json!({
                     "run_id": row.get::<_, String>(0)?,
                     "source": row.get::<_, Option<String>>(1)?,
@@ -310,9 +319,9 @@ impl CollectorStore {
                     (SELECT tip.event_hash FROM events tip WHERE tip.run_id = runs.run_id ORDER BY tip.sequence DESC LIMIT 1) \
                  FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
                  GROUP BY runs.run_id, runs.source, runs.created_at \
-                 ORDER BY runs.created_at DESC, runs.run_id ASC",
+                 ORDER BY runs.created_at DESC, runs.run_id ASC LIMIT ?1",
             )?;
-            let rows = statement.query_map([], |row| {
+            let rows = statement.query_map(params![limit], |row| {
                 Ok(json!({
                     "run_id": row.get::<_, String>(0)?,
                     "source": row.get::<_, Option<String>>(1)?,
@@ -515,7 +524,7 @@ impl CollectorStore {
     }
 
     pub fn dashboard_html(&self) -> Result<String> {
-        let runs = self.run_rows(None)?;
+        let runs = self.run_rows(None, None)?;
         let mut html = String::from(
             r#"<!doctype html>
 <html lang="en">
@@ -831,6 +840,7 @@ fn ingest_options(query: Option<&str>) -> Result<IngestOptions> {
 fn run_list_options(query: Option<&str>) -> Result<RunListOptions> {
     Ok(RunListOptions {
         limit: query_param_u64(query, "limit")?,
+        source: query_param_string(query, "source"),
     })
 }
 
@@ -963,6 +973,7 @@ mod tests {
                 "SELECT name FROM sqlite_master WHERE type = 'index' \
                  AND name IN (
                     'idx_collector_runs_created_at_run_id',
+                    'idx_collector_runs_source_created_at_run_id',
                     'idx_collector_events_run_type_sequence'
                  ) ORDER BY name ASC",
             )
@@ -978,6 +989,7 @@ mod tests {
             vec![
                 "idx_collector_events_run_type_sequence",
                 "idx_collector_runs_created_at_run_id",
+                "idx_collector_runs_source_created_at_run_id",
             ]
         );
     }
@@ -1141,25 +1153,33 @@ mod tests {
     }
 
     #[test]
-    fn http_runs_support_limit() {
+    fn http_runs_support_limit_and_source_filter() {
         let dir = tempdir().unwrap();
         let db = dir.path().join("collector.sqlite");
         let mut store = CollectorStore::open(&db).unwrap();
 
-        for run_id in ["run_http_one", "run_http_two"] {
+        for (run_id, source) in [
+            ("run_http_one", "source-a"),
+            ("run_http_two", "source-b"),
+            ("run_http_three", "source-a"),
+        ] {
             let start = build_event_from_input(EventInput::new(run_id, 1, "run.start")).unwrap();
-            store.ingest_events("test", &[start]).unwrap();
+            store.ingest_events(source, &[start]).unwrap();
         }
 
-        let response =
-            http_response_for_request("GET /runs?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n", &db);
+        let response = http_response_for_request(
+            "GET /runs?source=source-a&limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
         assert!(response.starts_with("HTTP/1.1 200 OK"));
         let body = response.split("\r\n\r\n").nth(1).unwrap();
         let value: Value = serde_json::from_str(body).unwrap();
         assert_eq!(value["count"], 1);
         assert_eq!(value["limit"], 1);
+        assert_eq!(value["source"], "source-a");
         assert_eq!(value["has_more"], true);
         assert_eq!(value["runs"].as_array().unwrap().len(), 1);
+        assert_eq!(value["runs"][0]["source"], "source-a");
         assert_eq!(value["runs"][0]["event_count"], 1);
         assert_eq!(value["runs"][0]["last_sequence"], 1);
         assert!(

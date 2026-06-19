@@ -57,6 +57,7 @@ Implemented:
 - collector run summaries include event-type counts
 - direct collector event lookup by sequence
 - bounded collector run listing with `has_more`
+- collector run listing filtered by source
 - bounded collector event listing by event sequence
 - collector event filtering by event type
 - collector event pagination metadata with `has_more`
@@ -97,7 +98,7 @@ agentprov import codex <jsonl-or-> --out <jsonl> [--key <key>]
 agentprov import claude <jsonl-or-> --out <jsonl> [--key <key>]
 agentprov validate <manifest|run-envelope|event|policy> <file>
 agentprov collector ingest <jsonl> --db <db> [--require-signatures]
-agentprov collector runs --db <db> [--limit <n>]
+agentprov collector runs --db <db> [--limit <n>] [--source <source>]
 agentprov collector run <run_id> --db <db>
 agentprov collector event <run_id> <sequence> --db <db>
 agentprov collector events <run_id> --db <db> [--after-sequence <n>] [--limit <n>] [--type <event-type>]
@@ -249,6 +250,7 @@ Completed:
 - collector run summaries include event-type counts
 - direct event lookup by stable sequence
 - bounded run listing with `has_more`
+- run listing filtered by source
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`

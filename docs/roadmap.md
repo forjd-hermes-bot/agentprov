@@ -155,6 +155,7 @@ Status: partial.
 - run summaries include event-type counts
 - direct event lookup by stable sequence
 - bounded run listing with `has_more`
+- run listing filtered by source
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`

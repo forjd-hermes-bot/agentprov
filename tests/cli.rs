@@ -318,7 +318,7 @@ fn collector_event_prints_one_sequence() {
 }
 
 #[test]
-fn collector_runs_supports_limit() {
+fn collector_runs_supports_limit_and_source_filter() {
     let dir = tempdir().unwrap();
     let db = dir.path().join("collector.sqlite");
 
@@ -380,6 +380,32 @@ fn collector_runs_supports_limit() {
             .unwrap()
             .starts_with("blake3:")
     );
+
+    let source = dir.path().join("one.jsonl");
+    let output = Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "runs",
+            "--db",
+            db.to_str().unwrap(),
+            "--limit",
+            "1",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["count"], 1);
+    assert_eq!(value["limit"], 1);
+    assert_eq!(value["source"], source.to_str().unwrap());
+    assert_eq!(value["has_more"], false);
+    assert_eq!(value["runs"][0]["source"], source.to_str().unwrap());
 }
 
 #[test]

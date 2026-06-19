@@ -281,6 +281,8 @@ enum CollectorCommand {
         db: PathBuf,
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         limit: Option<u64>,
+        #[arg(long)]
+        source: Option<String>,
     },
     Run {
         run_id: String,
@@ -861,9 +863,9 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
             println!("ingested run {run_id}");
             Ok(())
         }
-        CollectorCommand::Runs { db, limit } => {
+        CollectorCommand::Runs { db, limit, source } => {
             let store = CollectorStore::open(&db)?;
-            print_json(&store.list_runs_json(RunListOptions { limit })?)
+            print_json(&store.list_runs_json(RunListOptions { limit, source })?)
         }
         CollectorCommand::Run { run_id, db } => {
             let store = CollectorStore::open(&db)?;

@@ -5,9 +5,10 @@ logs. It stores original event JSON in SQLite and verifies stored runs with the
 same event-chain verifier used by `agentprov run verify`. Bulk ingest rejects
 run logs whose event chain does not verify.
 
-The SQLite store initializes secondary indexes for run listing order and
-event-type filtered event pages. The primary `(run_id, sequence)` key remains
-the stable lookup path for direct event reads and unfiltered event pages.
+The SQLite store initializes secondary indexes for run listing order,
+source-filtered run listings, and event-type filtered event pages. The primary
+`(run_id, sequence)` key remains the stable lookup path for direct event reads
+and unfiltered event pages.
 
 ## CLI
 
@@ -23,6 +24,7 @@ List runs:
 ```bash
 agentprov collector runs --db agentprov.sqlite
 agentprov collector runs --db agentprov.sqlite --limit 25
+agentprov collector runs --db agentprov.sqlite --source runs/run_123.jsonl
 ```
 
 Show one run summary:
@@ -122,13 +124,15 @@ Response:
 `GET /runs`
 
 Returns known runs with per-run `event_count`, `last_sequence`, and
-`last_event_hash` values. Optional `limit` returns a bounded page:
+`last_event_hash` values. Optional `limit` returns a bounded page, and optional
+`source` returns runs whose stored source exactly matches the supplied value:
 
 ```text
 GET /runs?limit=25
+GET /runs?source=http-stream&limit=25
 ```
 
-Responses include `count`, `limit`, and `has_more` metadata.
+Responses include `count`, `limit`, `source`, and `has_more` metadata.
 
 `GET /runs/<run_id>`
 
