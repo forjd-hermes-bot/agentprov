@@ -46,8 +46,8 @@ Implemented:
 - deterministic OpenAI-style, Anthropic-style, LiteLLM-style, GitHub tool,
   Discord tool, and scheduled-run Rust examples
 - local SQLite collector with CLI ingest, query, and verification commands
-- local HTTP collector endpoints for JSONL ingest, run listing, event lookup, and
-  verification
+- local HTTP collector endpoints for JSONL ingest, run listing, event lookup,
+  JSONL export, and verification
 - streaming HTTP collector endpoint for verified single-event appends
 - bounded collector run listing with `has_more`
 - bounded collector event listing by event sequence
@@ -227,6 +227,7 @@ Completed:
 - query API for runs and events
 - verification endpoint
 - import/export path between JSONL files and stored runs
+- HTTP JSONL export endpoint for stored runs
 - streaming append endpoint for one verified event at a time
 - bounded run listing with `has_more`
 - bounded event listing by stable event sequence

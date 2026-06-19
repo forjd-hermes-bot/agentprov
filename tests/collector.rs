@@ -43,6 +43,13 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     assert_eq!(exported_count, 2);
     assert_eq!(read_jsonl(&exported).unwrap(), read_jsonl(&run).unwrap());
 
+    let exported_jsonl = store.export_jsonl_string("run_collector_test").unwrap();
+    let exported_events = exported_jsonl
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(exported_events, read_jsonl(&run).unwrap());
+
     let html = store.dashboard_html().unwrap();
     assert!(html.contains("AgentProv Collector"));
     assert!(html.contains("run_collector_test"));

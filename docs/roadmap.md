@@ -145,6 +145,7 @@ Status: partial.
 - SQLite persistence
 - query API for runs/events
 - verification endpoint
+- HTTP JSONL export endpoint for stored runs
 - streaming append endpoint for one verified event at a time
 - bounded run listing with `has_more`
 - bounded event listing by stable event sequence

@@ -176,6 +176,16 @@ impl CollectorStore {
         Ok(count)
     }
 
+    pub fn export_jsonl_string(&self, run_id: &str) -> Result<String> {
+        let events = self.run_events(run_id)?;
+        let mut jsonl = String::new();
+        for event in events {
+            jsonl.push_str(&serde_json::to_string(&event)?);
+            jsonl.push('\n');
+        }
+        Ok(jsonl)
+    }
+
     pub fn list_runs(&self) -> Result<Value> {
         self.list_runs_json(RunListOptions::default())
     }
@@ -553,6 +563,13 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
                 &store.run_events_json(run_id, event_list_options(query)?)?,
             )?
         }
+        ("GET", path) if path.starts_with("/runs/") && path.ends_with("/export") => {
+            let run_id = path
+                .trim_start_matches("/runs/")
+                .trim_end_matches("/export")
+                .trim_end_matches('/');
+            jsonl_response(200, &store.export_jsonl_string(run_id)?)
+        }
         ("GET", path) if path.starts_with("/runs/") && path.ends_with("/verify") => {
             let run_id = path
                 .trim_start_matches("/runs/")
@@ -700,18 +717,30 @@ fn parse_json_body(body: &str) -> Result<Value> {
 }
 
 fn json_response(status: u16, value: &Value) -> Result<String> {
-    let reason = match status {
-        200 => "OK",
-        400 => "Bad Request",
-        404 => "Not Found",
-        500 => "Internal Server Error",
-        _ => "OK",
-    };
+    let reason = http_reason(status);
     let body = serde_json::to_string(value)?;
     Ok(format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     ))
+}
+
+fn jsonl_response(status: u16, body: &str) -> String {
+    let reason = http_reason(status);
+    format!(
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/x-ndjson\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+}
+
+fn http_reason(status: u16) -> &'static str {
+    match status {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        500 => "Internal Server Error",
+        _ => "OK",
+    }
 }
 
 fn escape_html(value: &str) -> String {
@@ -808,5 +837,35 @@ mod tests {
         assert_eq!(value["limit"], 1);
         assert_eq!(value["has_more"], true);
         assert_eq!(value["runs"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn http_runs_export_jsonl() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+        let mut store = CollectorStore::open(&db).unwrap();
+
+        let start =
+            build_event_from_input(EventInput::new("run_http_export", 1, "run.start")).unwrap();
+        let mut tool = EventInput::new("run_http_export", 2, "tool.execute");
+        tool.previous_event_hash = Some(start["event_hash"].as_str().unwrap().to_owned());
+        let tool = build_event_from_input(tool).unwrap();
+        store
+            .ingest_events("test", &[start.clone(), tool.clone()])
+            .unwrap();
+
+        let response = http_response_for_request(
+            "GET /runs/run_http_export/export HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("Content-Type: application/x-ndjson"));
+
+        let body = response.split("\r\n\r\n").nth(1).unwrap();
+        let exported = body
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(exported, vec![start, tool]);
     }
 }
