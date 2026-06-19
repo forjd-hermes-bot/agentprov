@@ -767,6 +767,141 @@ fn policy_check_emits_approval_request_when_required() {
 }
 
 #[test]
+fn approval_commands_append_signed_grant_and_deny_events() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+    let key = dir.path().join("agentprov.key");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["key", "generate", "--out", key.to_str().unwrap()])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "policy",
+            "check",
+            "--policy",
+            "examples/policy.json",
+            "--agent",
+            "agent_01hxexample",
+            "--action",
+            "github.pr.merge",
+            "--resource",
+            "repo://forjd/agentprov/pull/1",
+            "--emit-event",
+            "--run",
+            run.to_str().unwrap(),
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "approval",
+            "grant",
+            "--run",
+            run.to_str().unwrap(),
+            "--approval-id",
+            "approval_grant_1",
+            "--approver",
+            "danjdewhurst",
+            "--agent",
+            "agent_01hxexample",
+            "--action",
+            "github.pr.merge",
+            "--resource",
+            "repo://forjd/agentprov/pull/1",
+            "--reason",
+            "release window approved",
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("approval grant event appended"));
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "approval",
+            "deny",
+            "--run",
+            run.to_str().unwrap(),
+            "--approval-id",
+            "approval_deny_1",
+            "--approver",
+            "danjdewhurst",
+            "--agent",
+            "agent_01hxexample",
+            "--action",
+            "github.pr.merge",
+            "--resource",
+            "repo://forjd/agentprov/pull/2",
+            "--reason",
+            "missing review",
+            "--key",
+            key.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("approval deny event appended"));
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "verify",
+            run.to_str().unwrap(),
+            "--require-signatures",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Events: 5"))
+        .stdout(predicate::str::contains("Signatures: valid"));
+
+    let events = read_jsonl_fixture(&run);
+    assert_eq!(events[3]["event_type"], "human.approval.grant");
+    assert_eq!(events[3]["subject"]["id"], "danjdewhurst");
+    assert_eq!(events[3]["metadata"]["approval_id"], "approval_grant_1");
+    assert_eq!(events[3]["metadata"]["approval_status"], "granted");
+    assert_eq!(
+        events[3]["metadata"]["approved_subject"],
+        "agent_01hxexample"
+    );
+    assert_eq!(events[3]["metadata"]["reason"], "release window approved");
+    assert!(events[3]["signature"].is_object());
+
+    assert_eq!(events[4]["event_type"], "human.approval.deny");
+    assert_eq!(events[4]["metadata"]["approval_id"], "approval_deny_1");
+    assert_eq!(events[4]["metadata"]["approval_status"], "denied");
+    assert_eq!(events[4]["metadata"]["reason"], "missing review");
+    assert!(events[4]["signature"].is_object());
+}
+
+#[test]
 fn demo_manual_tool_run_generates_verifiable_run_log() {
     let dir = tempdir().unwrap();
 

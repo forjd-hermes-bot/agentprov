@@ -50,3 +50,12 @@ When `agentprov policy check --emit-event` evaluates to `require_approval`, the
 CLI writes both a `permission.check` event and a `human.approval.request` event
 to the run log. Approval grants and denials can be represented with
 `human.approval.grant` and `human.approval.deny` events.
+
+The CLI can append those decisions directly:
+
+```bash
+agentprov approval grant --run runs/run_123.jsonl --approval-id approval_123 --approver user_1 --agent agent_01hxexample --action github.pr.merge --resource repo://forjd/agentprov/pull/1
+agentprov approval deny --run runs/run_123.jsonl --approval-id approval_124 --approver user_1 --agent agent_01hxexample --action github.pr.merge --resource repo://forjd/agentprov/pull/2
+```
+
+Pass `--key <key>` to sign the appended approval event with a local MVP key.

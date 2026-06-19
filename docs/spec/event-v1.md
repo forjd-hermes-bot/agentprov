@@ -61,7 +61,9 @@ The MVP signs the event hash with Ed25519 and stores the signature in the top-le
 
 See `examples/approval-request-event.json`,
 `examples/approval-grant-event.json`, and
-`examples/approval-deny-event.json` for the initial approval event shape.
+`examples/approval-deny-event.json` for the initial approval event shape. The
+CLI can append grant and deny records with `agentprov approval grant` and
+`agentprov approval deny`.
 
 ## Privacy considerations
 

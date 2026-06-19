@@ -96,6 +96,13 @@ Check a static policy:
 cargo run -- policy check --policy examples/policy.json --agent agent_01hxexample --action discord.message.create --resource discord://guild/148756/channel/456
 ```
 
+Append a human approval decision:
+
+```bash
+cargo run -- approval grant --run runs/run_123.jsonl --approval-id approval_123 --approver danjdewhurst --agent agent_01hxexample --action github.pr.merge --resource repo://forjd/agentprov/pull/1
+cargo run -- approval deny --run runs/run_123.jsonl --approval-id approval_124 --approver danjdewhurst --agent agent_01hxexample --action github.pr.merge --resource repo://forjd/agentprov/pull/2
+```
+
 Validate records against the embedded schemas:
 
 ```bash

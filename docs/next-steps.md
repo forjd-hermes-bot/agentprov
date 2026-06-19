@@ -33,6 +33,7 @@ Implemented:
 - static policy checks with allow, deny, and require-approval rules
 - policy rule expiry support
 - approval request event emission for `require_approval` decisions
+- approval grant and deny event append commands with optional signatures
 - deterministic manual tool-run demo
 - Codex and Claude Code JSONL importers
 - importer redaction rules for command text, assistant text, and tool results
@@ -74,6 +75,8 @@ agentprov key generate --out <file>
 agentprov key public --key <file>
 agentprov key inspect --key <file>
 agentprov policy check --policy <file> --agent <id> --action <action> --resource <resource>
+agentprov approval grant --run <jsonl> --approval-id <id> --approver <id> --agent <id> --action <action> --resource <resource> [--reason <text>] [--key <key>]
+agentprov approval deny --run <jsonl> --approval-id <id> --approver <id> --agent <id> --action <action> --resource <resource> [--reason <text>] [--key <key>]
 agentprov demo manual-tool-run --out <dir>
 agentprov export otel <jsonl> --out <file>
 agentprov export openinference <jsonl> --out <file>
@@ -159,11 +162,7 @@ Completed:
 - implement `expires_at` support
 - add examples for `human.approval.request`, `human.approval.grant`, and
   `human.approval.deny`
-
-Future production work:
-
-- decide whether approval grant/deny should get first-class CLI append helpers
-- add signed approval event examples
+- add first-class CLI append helpers for signed approval grant and deny events
 
 ## Milestone 4: Harden imports and exports
 

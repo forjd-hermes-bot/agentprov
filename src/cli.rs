@@ -52,6 +52,10 @@ enum Commands {
         #[command(subcommand)]
         command: PolicyCommand,
     },
+    Approval {
+        #[command(subcommand)]
+        command: ApprovalCommand,
+    },
     Demo {
         #[command(subcommand)]
         command: DemoCommand,
@@ -183,6 +187,32 @@ enum PolicyCommand {
         #[arg(long)]
         key: Option<PathBuf>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum ApprovalCommand {
+    Grant(ApprovalArgs),
+    Deny(ApprovalArgs),
+}
+
+#[derive(clap::Args, Debug)]
+struct ApprovalArgs {
+    #[arg(long)]
+    run: PathBuf,
+    #[arg(long)]
+    approval_id: String,
+    #[arg(long)]
+    approver: String,
+    #[arg(long)]
+    agent: String,
+    #[arg(long)]
+    action: String,
+    #[arg(long)]
+    resource: String,
+    #[arg(long)]
+    reason: Option<String>,
+    #[arg(long)]
+    key: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -414,6 +444,7 @@ pub fn run() -> Result<()> {
         Commands::Event { command } => handle_event(command),
         Commands::Key { command } => handle_key(command),
         Commands::Policy { command } => handle_policy(command),
+        Commands::Approval { command } => handle_approval(command),
         Commands::Demo { command } => handle_demo(command),
         Commands::Export { command } => handle_export(command),
         Commands::Import { command } => handle_import(command),
@@ -622,6 +653,72 @@ fn handle_policy(command: PolicyCommand) -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn handle_approval(command: ApprovalCommand) -> Result<()> {
+    match command {
+        ApprovalCommand::Grant(args) => append_approval_event(args, ApprovalOutcome::Grant),
+        ApprovalCommand::Deny(args) => append_approval_event(args, ApprovalOutcome::Deny),
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ApprovalOutcome {
+    Grant,
+    Deny,
+}
+
+impl ApprovalOutcome {
+    fn event_type(self) -> &'static str {
+        match self {
+            ApprovalOutcome::Grant => "human.approval.grant",
+            ApprovalOutcome::Deny => "human.approval.deny",
+        }
+    }
+
+    fn status(self) -> &'static str {
+        match self {
+            ApprovalOutcome::Grant => "granted",
+            ApprovalOutcome::Deny => "denied",
+        }
+    }
+
+    fn noun(self) -> &'static str {
+        match self {
+            ApprovalOutcome::Grant => "grant",
+            ApprovalOutcome::Deny => "deny",
+        }
+    }
+}
+
+fn append_approval_event(args: ApprovalArgs, outcome: ApprovalOutcome) -> Result<()> {
+    let mut metadata = json!({
+        "approval_id": args.approval_id,
+        "approval_status": outcome.status(),
+        "approved_subject": args.agent,
+    });
+    if let Some(reason) = args.reason {
+        metadata["reason"] = Value::String(reason);
+    }
+
+    let mut event = next_event_for_run(
+        &args.run,
+        outcome.event_type().to_owned(),
+        Some(args.action),
+        Some(args.resource),
+        Some(args.approver),
+        Some(metadata),
+    )?;
+    if let Some(key_path) = args.key {
+        sign_value(&mut event, &read_key(&key_path)?)?;
+    }
+    append_jsonl(&args.run, &event)?;
+    println!(
+        "approval {} event appended to {}",
+        outcome.noun(),
+        args.run.display()
+    );
+    Ok(())
 }
 
 fn handle_demo(command: DemoCommand) -> Result<()> {

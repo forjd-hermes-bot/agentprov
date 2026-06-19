@@ -77,12 +77,12 @@ Status: done for static policy checks.
 - CLI policy check command
 - permission decision event generation
 - approval request event generation
+- approval grant/deny append commands with optional local signatures
 - approval request/grant/deny examples
 
 Future work:
 
-- decide whether approval grant/deny should get first-class CLI append helpers
-- add signed approval event examples
+- external approval workflow integrations
 
 ## Phase 5: SDK shape
 
