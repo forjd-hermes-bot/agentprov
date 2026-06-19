@@ -1,0 +1,32 @@
+{
+  "schema": "agentprov.dev/policy/v1",
+  "policy_id": "policy_research_agent",
+  "version": "v1",
+  "agent_id": "agent_01hxexample",
+  "allow": [
+    {
+      "action": "http.get",
+      "resource": "https://*.gov.uk/*"
+    },
+    {
+      "action": "discord.message.create",
+      "resource": "discord://guild/148756/*"
+    },
+    {
+      "action": "discord.message.create",
+      "resource": "discord://guild/123/*"
+    }
+  ],
+  "require_approval": [
+    {
+      "action": "github.pr.merge",
+      "resource": "*"
+    }
+  ],
+  "deny": [
+    {
+      "action": "secret.read",
+      "resource": "prod/*"
+    }
+  ]
+}
