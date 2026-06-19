@@ -55,4 +55,4 @@ AgentProv aims to answer whether the actor, authority, runtime and event chain a
 
 ## License
 
-MIT OR Apache-2.0
+MIT
