@@ -62,6 +62,7 @@ Implemented:
 - collector event pagination metadata with `has_more`
 - HTTP collector verification with optional signature enforcement
 - structured JSON errors for collector HTTP requests
+- collector health check endpoint
 - static read-only collector dashboard export
 - trust semantics note for local signatures, manifest binding, run envelopes, and
   future trust roots
@@ -252,6 +253,7 @@ Completed:
 - pagination metadata with `has_more`
 - HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
+- collector health check endpoint
 
 Future production work:
 

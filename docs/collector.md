@@ -63,6 +63,17 @@ agentprov collector serve --addr 127.0.0.1:8787 --db agentprov.sqlite
 
 ## HTTP endpoints
 
+`GET /healthz`
+
+Returns a small readiness response after the collector can open the configured
+SQLite database:
+
+```json
+{
+  "status": "ok"
+}
+```
+
 `POST /ingest`
 
 Request body: AgentProv JSONL events. The collector verifies the event chain

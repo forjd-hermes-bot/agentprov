@@ -160,6 +160,7 @@ Status: partial.
 - pagination metadata with `has_more`
 - HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
+- collector health check endpoint
 
 Future work:
 

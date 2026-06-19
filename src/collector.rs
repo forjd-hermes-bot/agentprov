@@ -654,6 +654,7 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
     let mut store = CollectorStore::open(db)?;
 
     let response = match (method, path) {
+        ("GET", "/healthz") => json_response(200, &json!({"status": "ok"}))?,
         ("POST", "/ingest") => {
             let events = parse_jsonl_body(body)?;
             let run_id =
@@ -947,6 +948,21 @@ mod tests {
     use crate::event::{EventInput, build_event_from_input};
     use crate::signing::{generate_key, sign_value};
     use tempfile::tempdir;
+
+    #[test]
+    fn http_healthz_reports_ok() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+
+        let response =
+            http_response_for_request("GET /healthz HTTP/1.1\r\nHost: localhost\r\n\r\n", &db);
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("Content-Type: application/json"));
+        let body = response.split("\r\n\r\n").nth(1).unwrap();
+        let value: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(value["status"], "ok");
+    }
 
     #[test]
     fn http_errors_are_returned_as_json_responses() {
