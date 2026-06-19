@@ -32,6 +32,21 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     assert_eq!(runs["runs"][0]["run_id"], "run_collector_test");
     assert_eq!(runs["runs"][0]["event_count"], 2);
 
+    let summary = store.run_summary_json("run_collector_test").unwrap();
+    assert_eq!(summary["run_id"], "run_collector_test");
+    assert_eq!(summary["event_count"], 2);
+    let event_types = summary["event_types"].as_array().unwrap();
+    assert!(
+        event_types
+            .iter()
+            .any(|event_type| event_type["event_type"] == "run.start" && event_type["count"] == 1)
+    );
+    assert!(
+        event_types.iter().any(
+            |event_type| event_type["event_type"] == "tool.execute" && event_type["count"] == 1
+        )
+    );
+
     let events = store.run_events("run_collector_test").unwrap();
     assert_eq!(events.len(), 2);
     assert_eq!(events[1]["event_type"], "tool.execute");

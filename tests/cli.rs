@@ -304,6 +304,79 @@ fn collector_runs_supports_limit() {
 }
 
 #[test]
+fn collector_run_prints_summary() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+    let db = dir.path().join("collector.sqlite");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "event",
+            "append",
+            "--run",
+            run.to_str().unwrap(),
+            "--type",
+            "tool.execute",
+            "--action",
+            "http.get",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "ingest",
+            run.to_str().unwrap(),
+            "--db",
+            db.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let run_id = read_jsonl_fixture(&run)[0]["run_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let output = Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["collector", "run", &run_id, "--db", db.to_str().unwrap()])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["run_id"], run_id.as_str());
+    assert_eq!(value["event_count"], 2);
+    assert!(
+        value["event_types"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |event_type| event_type["event_type"] == "tool.execute" && event_type["count"] == 1
+            )
+    );
+}
+
+#[test]
 fn collector_ingest_can_require_signatures() {
     let dir = tempdir().unwrap();
     let run = dir.path().join("run.jsonl");

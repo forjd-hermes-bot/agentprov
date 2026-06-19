@@ -21,6 +21,12 @@ agentprov collector runs --db agentprov.sqlite
 agentprov collector runs --db agentprov.sqlite --limit 25
 ```
 
+Show one run summary:
+
+```bash
+agentprov collector run run_123 --db agentprov.sqlite
+```
+
 Read events for a run:
 
 ```bash
@@ -107,6 +113,14 @@ GET /runs?limit=25
 ```
 
 Responses include `count`, `limit`, and `has_more` metadata.
+
+`GET /runs/<run_id>`
+
+Returns one run summary with `event_count` and per-`event_type` counts:
+
+```text
+GET /runs/run_123
+```
 
 `GET /runs/<run_id>/events`
 

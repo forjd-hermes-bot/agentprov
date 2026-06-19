@@ -250,6 +250,30 @@ impl CollectorStore {
         }))
     }
 
+    pub fn run_summary_json(&self, run_id: &str) -> Result<Value> {
+        let mut summary = self
+            .connection
+            .query_row(
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                 FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
+                 WHERE runs.run_id = ?1 \
+                 GROUP BY runs.run_id, runs.source, runs.created_at",
+                params![run_id],
+                |row| {
+                    Ok(json!({
+                        "run_id": row.get::<_, String>(0)?,
+                        "source": row.get::<_, Option<String>>(1)?,
+                        "created_at": row.get::<_, String>(2)?,
+                        "event_count": row.get::<_, i64>(3)?,
+                    }))
+                },
+            )
+            .optional()?
+            .with_context(|| format!("run not found: {run_id}"))?;
+        summary["event_types"] = json!(self.event_type_counts(run_id)?);
+        Ok(summary)
+    }
+
     fn run_rows(&self, limit: Option<i64>) -> Result<Vec<Value>> {
         if let Some(limit) = limit {
             let mut statement = self.connection.prepare(
@@ -284,6 +308,19 @@ impl CollectorStore {
             })?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
         }
+    }
+
+    fn event_type_counts(&self, run_id: &str) -> Result<Vec<Value>> {
+        let mut statement = self.connection.prepare(
+            "SELECT event_type, COUNT(*) FROM events WHERE run_id = ?1 GROUP BY event_type ORDER BY event_type ASC",
+        )?;
+        let rows = statement.query_map(params![run_id], |row| {
+            Ok(json!({
+                "event_type": row.get::<_, String>(0)?,
+                "count": row.get::<_, i64>(1)?,
+            }))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn run_events(&self, run_id: &str) -> Result<Vec<Value>> {
@@ -633,6 +670,14 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
                 &store.verify_run(run_id, verify_require_signatures(query)?)?,
             )?
         }
+        ("GET", path) if path.starts_with("/runs/") => {
+            let run_id = path.trim_start_matches("/runs/").trim_end_matches('/');
+            if run_id.is_empty() || run_id.contains('/') {
+                json_response(404, &json!({"error": "not found"}))?
+            } else {
+                json_response(200, &store.run_summary_json(run_id)?)?
+            }
+        }
         _ => json_response(404, &json!({"error": "not found"}))?,
     };
 
@@ -938,6 +983,19 @@ mod tests {
         store
             .ingest_events("test", &[start, tool, permission])
             .unwrap();
+
+        let summary_response = http_response_for_request(
+            "GET /runs/run_http_filter HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(summary_response.starts_with("HTTP/1.1 200 OK"));
+        let body = summary_response.split("\r\n\r\n").nth(1).unwrap();
+        let summary: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(summary["run_id"], "run_http_filter");
+        assert_eq!(summary["event_count"], 3);
+        assert!(summary["event_types"].as_array().unwrap().iter().any(
+            |event_type| event_type["event_type"] == "tool.execute" && event_type["count"] == 1
+        ));
 
         let response = http_response_for_request(
             "GET /runs/run_http_filter/events?event_type=tool.execute&limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",

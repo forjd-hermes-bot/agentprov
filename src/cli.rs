@@ -282,6 +282,11 @@ enum CollectorCommand {
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         limit: Option<u64>,
     },
+    Run {
+        run_id: String,
+        #[arg(long)]
+        db: PathBuf,
+    },
     Events {
         run_id: String,
         #[arg(long)]
@@ -853,6 +858,10 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
         CollectorCommand::Runs { db, limit } => {
             let store = CollectorStore::open(&db)?;
             print_json(&store.list_runs_json(RunListOptions { limit })?)
+        }
+        CollectorCommand::Run { run_id, db } => {
+            let store = CollectorStore::open(&db)?;
+            print_json(&store.run_summary_json(&run_id)?)
         }
         CollectorCommand::Events {
             run_id,
