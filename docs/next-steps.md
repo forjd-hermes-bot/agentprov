@@ -6,7 +6,7 @@ The next goal is to turn it from a research-backed skeleton into a small, demons
 
 ## Current state
 
-Repository: https://github.com/forjd-hermes-bot/agentprov
+Repository: https://github.com/forjd/agentprov
 
 Implemented:
 

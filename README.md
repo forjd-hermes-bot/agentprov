@@ -1,32 +1,34 @@
 # AgentProv
 
-AgentProv is a Rust MVP for signed provenance records for AI agent runs.
+[![CI](https://github.com/forjd/agentprov/actions/workflows/ci.yml/badge.svg)](https://github.com/forjd/agentprov/actions/workflows/ci.yml)
 
-Existing LLM observability tools are good at showing what happened: prompts, model calls, tool calls, latency, cost and traces. AgentProv focuses on the next audit question:
+Signed, tamper-evident provenance records for AI agent runs.
+
+AgentProv is a Rust-first MVP for answering the audit questions that ordinary LLM observability usually leaves open:
 
 > Who or what ran this agent, with what authority, where did it run, and does the record still verify?
 
-## What AgentProv is for
+It is designed to sit beside systems such as Langfuse, Phoenix/OpenInference, AgentOps, Helicone, MLflow, and Weave. Those tools show prompts, model calls, tool calls, latency, cost, and traces. AgentProv focuses on identity, authority, policy decisions, and tamper evidence.
 
-AgentProv is intended to sit beside tools like Langfuse, Phoenix/OpenInference, AgentOps, Helicone, MLflow and Weave rather than replace them.
+## What it records
 
-Those tools show what happened. AgentProv aims to prove:
+- Agent identity, owner, source repository, version, runtime, capabilities, and policy reference
+- Run trigger, actor chain, runtime context, available tools, and policy version
+- Permission checks for agent actions against scoped resources
+- Append-only provenance events linked by canonical hashes
+- Optional local signatures for manifests, events, and run records
+- Experimental exports to OpenTelemetry-style and OpenInference-style JSON
 
-- which agent identity ran
-- which trigger started the run
-- which actor chain led to the action
-- which capabilities and policies were available
-- which permission checks allowed or denied actions
-- whether the run log was modified afterwards
+## Quick start
 
-## 30-second demo
+Run a complete local demo:
 
 ```bash
 cargo run -- demo manual-tool-run --out demo-output/
 cargo run -- run verify demo-output/run.jsonl
 ```
 
-Expected shape:
+Expected output shape:
 
 ```text
 Run verifies
@@ -37,63 +39,80 @@ Signatures: not present
 
 ## Install
 
-From source:
+Install from GitHub:
 
 ```bash
-cargo install --git https://github.com/forjd-hermes-bot/agentprov
+cargo install --git https://github.com/forjd/agentprov
 agentprov --version
 ```
 
-For local development:
+Or clone the repository for local development:
 
 ```bash
-git clone https://github.com/forjd-hermes-bot/agentprov.git
+git clone https://github.com/forjd/agentprov.git
 cd agentprov
 cargo run -- --version
 ```
 
-## Current CLI
+## CLI examples
+
+Generate example records:
 
 ```bash
-# Examples
 cargo run -- manifest example
 cargo run -- run example
+```
 
-# Event hashing and verification
+Hash and verify event records:
+
+```bash
 cargo run -- event hash examples/event.json
 cargo run -- event verify examples/event.json
+```
 
-# Append-only run logs
+Create and verify an append-only run log:
+
+```bash
 cargo run -- run init --agent examples/manifest.json --trigger manual --out runs/run_123.jsonl
 cargo run -- event append --run runs/run_123.jsonl --type permission.check --action discord.message.create --resource discord://guild/123/channel/456
 cargo run -- run verify runs/run_123.jsonl
+```
 
-# Local MVP signing
+Generate a local key and sign an event:
+
+```bash
 cargo run -- key generate --out agentprov.key
 cargo run -- event sign examples/event.json --key agentprov.key --out event.signed.json
 cargo run -- event verify-signature event.signed.json
+```
 
-# Static policy checks
+Check a static policy:
+
+```bash
 cargo run -- policy check --policy examples/policy.json --agent agent_01hxexample --action discord.message.create --resource discord://guild/148756/channel/456
+```
 
-# Export experiments
+Export a run log:
+
+```bash
 cargo run -- export otel demo-output/run.jsonl --out run.otlp.json
 cargo run -- export openinference demo-output/run.jsonl --out run.openinference.json
 ```
 
-## Documentation
+## Repository map
 
-- `docs/research/summary.md` — short research summary
-- `docs/research/detailed-findings.md` — findings from existing OSS tools
-- `docs/mvp-scope.md` — MVP product scope
-- `docs/next-steps.md` — implementation plan
-- `docs/roadmap.md` — longer roadmap
-- `docs/threat-model.md` — threat model
-- `docs/otel-mapping.md` — OpenTelemetry/OpenInference mapping notes
-- `docs/spec/` — versioned spec docs
-- `schemas/` — machine-readable JSON Schemas
+- `src/` - Rust CLI and provenance primitives
+- `examples/` - sample manifest, run, event, and policy records
+- `schemas/` - machine-readable JSON Schemas
+- `docs/spec/` - versioned spec notes
+- `docs/research/` - research notes from existing OSS tools
+- `docs/mvp-scope.md` - MVP product scope
+- `docs/otel-mapping.md` - OpenTelemetry/OpenInference mapping notes
+- `docs/threat-model.md` - threat model
 
-## Local quality gates
+## Quality gates
+
+Run these before opening a pull request:
 
 ```bash
 cargo fmt --check
@@ -104,7 +123,7 @@ cargo build --release
 
 ## Status
 
-This is an early MVP. Key handling is for local experimentation only, not production key management.
+AgentProv is an early MVP. The record formats, CLI, and schemas are still expected to change. Local key handling is for experimentation only, not production key management.
 
 ## License
 

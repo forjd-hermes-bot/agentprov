@@ -5,7 +5,7 @@ Thanks for considering a contribution to AgentProv.
 ## Development setup
 
 ```bash
-git clone https://github.com/forjd-hermes-bot/agentprov.git
+git clone https://github.com/forjd/agentprov.git
 cd agentprov
 cargo test
 ```
