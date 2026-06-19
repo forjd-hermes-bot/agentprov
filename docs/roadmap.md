@@ -145,11 +145,11 @@ Status: partial.
 - SQLite persistence
 - query API for runs/events
 - verification endpoint
+- streaming append endpoint for one verified event at a time
 
 Future work:
 
 - authentication and transport security design
-- streaming append endpoint
 - pagination and larger-run query ergonomics
 - Postgres persistence option if needed
 

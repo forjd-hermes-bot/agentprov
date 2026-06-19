@@ -144,6 +144,9 @@ cargo run -- collector ui --db agentprov.sqlite --out collector.html
 cargo run -- collector serve --addr 127.0.0.1:8787 --db agentprov.sqlite
 ```
 
+The collector HTTP surface supports complete JSONL ingest and verified
+single-event append; see `docs/collector.md` for endpoint details.
+
 ## Repository map
 
 - `src/` - Rust CLI and provenance primitives

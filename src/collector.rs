@@ -101,6 +101,57 @@ impl CollectorStore {
         Ok(run_id)
     }
 
+    pub fn append_event(&mut self, source: &str, run_id: &str, event: Value) -> Result<Value> {
+        let event_run_id = event
+            .get("run_id")
+            .and_then(Value::as_str)
+            .context("event has no run_id")?;
+        if event_run_id != run_id {
+            bail!("event run_id {event_run_id} does not match target run {run_id}");
+        }
+        let sequence = event
+            .get("sequence")
+            .and_then(Value::as_u64)
+            .context("event has no sequence")?;
+        let event_type = event
+            .get("event_type")
+            .and_then(Value::as_str)
+            .context("event has no event_type")?
+            .to_owned();
+        let event_hash = event
+            .get("event_hash")
+            .and_then(Value::as_str)
+            .context("event has no event_hash")?
+            .to_owned();
+
+        let mut events = self.run_events_or_empty(run_id)?;
+        events.push(event.clone());
+        verify_events(&events, false)?;
+
+        let tx = self.connection.transaction()?;
+        tx.execute(
+            "INSERT OR IGNORE INTO runs (run_id, source, created_at) VALUES (?1, ?2, ?3)",
+            params![run_id, source, Utc::now().to_rfc3339()],
+        )?;
+        tx.execute(
+            "INSERT INTO events (run_id, sequence, event_type, event_hash, event_json) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                run_id,
+                sequence as i64,
+                event_type,
+                event_hash,
+                serde_json::to_string(&event)?
+            ],
+        )?;
+        tx.commit()?;
+
+        Ok(json!({
+            "run_id": run_id,
+            "sequence": sequence,
+            "event_hash": event_hash,
+        }))
+    }
+
     pub fn ingest_jsonl_file(&mut self, path: &Path) -> Result<String> {
         let events = read_jsonl(path)?;
         self.ingest_events(&path.display().to_string(), &events)
@@ -126,14 +177,19 @@ impl CollectorStore {
     }
 
     pub fn run_events(&self, run_id: &str) -> Result<Vec<Value>> {
+        let events = self.run_events_or_empty(run_id)?;
+        if events.is_empty() {
+            bail!("run not found: {run_id}");
+        }
+        Ok(events)
+    }
+
+    fn run_events_or_empty(&self, run_id: &str) -> Result<Vec<Value>> {
         let mut statement = self
             .connection
             .prepare("SELECT event_json FROM events WHERE run_id = ?1 ORDER BY sequence ASC")?;
         let rows = statement.query_map(params![run_id], |row| row.get::<_, String>(0))?;
         let event_json = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-        if event_json.is_empty() {
-            bail!("run not found: {run_id}");
-        }
         event_json
             .into_iter()
             .map(|event| serde_json::from_str(&event).context("parse stored event JSON"))
@@ -286,6 +342,14 @@ fn handle_connection(mut stream: TcpStream, db: &Path) -> Result<()> {
             let run_id = store.ingest_events("http", &events)?;
             json_response(200, &json!({"run_id": run_id, "events": events.len()}))?
         }
+        ("POST", path) if path.starts_with("/runs/") && path.ends_with("/events") => {
+            let run_id = path
+                .trim_start_matches("/runs/")
+                .trim_end_matches("/events")
+                .trim_end_matches('/');
+            let report = store.append_event("http-stream", run_id, parse_json_body(body)?)?;
+            json_response(200, &report)?
+        }
         ("GET", "/runs") => json_response(200, &store.list_runs()?)?,
         ("GET", path) if path.starts_with("/runs/") && path.ends_with("/events") => {
             let run_id = path
@@ -355,6 +419,10 @@ fn parse_jsonl_body(body: &str) -> Result<Vec<Value>> {
         bail!("request body contains no events");
     }
     Ok(events)
+}
+
+fn parse_json_body(body: &str) -> Result<Value> {
+    serde_json::from_str(body.trim()).context("parse JSON request body")
 }
 
 fn json_response(status: u16, value: &Value) -> Result<String> {

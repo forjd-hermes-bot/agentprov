@@ -58,6 +58,22 @@ Response:
 }
 ```
 
+`POST /runs/<run_id>/events`
+
+Request body: one AgentProv event JSON object. The collector verifies the full
+stored event chain plus the new event before inserting it. A sequence-1 event
+creates the run; later events must link to the previous stored event hash.
+
+Response:
+
+```json
+{
+  "run_id": "run_123",
+  "sequence": 2,
+  "event_hash": "blake3:..."
+}
+```
+
 `GET /runs`
 
 Returns known runs.
@@ -74,7 +90,8 @@ Runs event-chain verification for one stored run.
 
 - The server is intentionally small and local-first.
 - There is no authentication, TLS, pagination, or multi-tenant isolation.
-- The HTTP surface accepts complete JSONL run logs, not streaming append yet.
+- Streaming append accepts complete AgentProv event records; it does not yet
+  expose a typed event builder over HTTP.
 - The HTML dashboard is a static read-only export, not a live web application.
 - Production deployments should put authentication, transport security, and key
   trust policy in front of or inside a more complete collector.

@@ -47,6 +47,7 @@ Implemented:
 - local SQLite collector with CLI ingest, query, and verification commands
 - local HTTP collector endpoints for JSONL ingest, run listing, event lookup, and
   verification
+- streaming HTTP collector endpoint for verified single-event appends
 - static read-only collector dashboard export
 - trust semantics note for local signatures, manifest binding, run envelopes, and
   future trust roots
@@ -221,11 +222,11 @@ Completed:
 - query API for runs and events
 - verification endpoint
 - import/export path between JSONL files and stored runs
+- streaming append endpoint for one verified event at a time
 
 Future production work:
 
 - authentication and transport security design
-- streaming append endpoint
 - pagination and larger-run query ergonomics
 - Postgres persistence option if needed
 
