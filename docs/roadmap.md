@@ -89,6 +89,7 @@ Future work:
 Status: partial.
 
 - typed Rust event and run-log append inputs
+- fluent setters for common Rust event input fields
 - stable Rust functions for event hashing, run-log verification, signing,
   signature verification, and policy checks
 - top-level Rust crate exports for common embedding primitives

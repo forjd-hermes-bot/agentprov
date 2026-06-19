@@ -143,6 +143,7 @@ cargo run --example scheduled_run -- runs/scheduled-run.jsonl
 
 The `library_api` example uses top-level crate exports such as `EventInput`,
 `AppendEventInput`, and `verify_run_log` for embedding AgentProv in Rust code.
+Input structs support fluent setters for common event fields.
 
 Use the local collector:
 

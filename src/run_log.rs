@@ -33,6 +33,31 @@ impl AppendEventInput {
             payload_digest: None,
         }
     }
+
+    pub fn action(mut self, action: impl Into<String>) -> Self {
+        self.action = Some(action.into());
+        self
+    }
+
+    pub fn resource(mut self, resource: impl Into<String>) -> Self {
+        self.resource = Some(resource.into());
+        self
+    }
+
+    pub fn subject(mut self, subject: impl Into<String>) -> Self {
+        self.subject = Some(subject.into());
+        self
+    }
+
+    pub fn metadata(mut self, metadata: Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    pub fn payload_digest(mut self, payload_digest: impl Into<String>) -> Self {
+        self.payload_digest = Some(payload_digest.into());
+        self
+    }
 }
 
 pub fn read_jsonl(path: &Path) -> Result<Vec<Value>> {

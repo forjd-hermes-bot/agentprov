@@ -43,6 +43,7 @@ Implemented:
   policy records
 - run verification rejects wrong event schema versions and mixed `run_id` values
 - typed Rust inputs for event construction and run-log appending
+- fluent setters for Rust event input structs
 - top-level Rust crate exports for common embedding primitives
 - library-level Rust example for embedding AgentProv primitives
 - deterministic OpenAI-style, Anthropic-style, LiteLLM-style, GitHub tool,
@@ -211,6 +212,7 @@ Completed:
 
 - expose stable functions for building events, appending logs, verifying logs,
   signing, verifying signatures, and policy checks
+- add fluent setters for common Rust event input fields
 - expose common Rust embedding primitives at the crate root
 - add a minimal library-level Rust example
 

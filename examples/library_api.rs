@@ -11,25 +11,25 @@ fn main() -> anyhow::Result<()> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("runs/library-api.jsonl"));
 
-    let mut start = EventInput::new("run_library_api_example", 1, "run.start");
-    start.action = Some("trigger.api".to_owned());
-    start.resource = Some("example://library-api".to_owned());
-    start.subject = Some("agent_01hxexample".to_owned());
-    start.metadata = Some(json!({
-        "agent": "research-agent",
-        "integration": "rust-library",
-        "capture": "digest-only"
-    }));
+    let start = EventInput::new("run_library_api_example", 1, "run.start")
+        .action("trigger.api")
+        .resource("example://library-api")
+        .subject("agent_01hxexample")
+        .metadata(json!({
+            "agent": "research-agent",
+            "integration": "rust-library",
+            "capture": "digest-only"
+        }));
     write_jsonl(&out, &[build_event_from_input(start)?])?;
 
-    let mut tool = AppendEventInput::new("tool.execute");
-    tool.action = Some("example.lookup".to_owned());
-    tool.resource = Some("example://dataset/customer-summary".to_owned());
-    tool.subject = Some("agent_01hxexample".to_owned());
-    tool.metadata = Some(json!({
-        "result_digest": "blake3:example-result",
-        "redaction": "payload omitted"
-    }));
+    let tool = AppendEventInput::new("tool.execute")
+        .action("example.lookup")
+        .resource("example://dataset/customer-summary")
+        .subject("agent_01hxexample")
+        .metadata(json!({
+            "result_digest": "blake3:example-result",
+            "redaction": "payload omitted"
+        }));
     append_event_to_run(&out, tool)?;
 
     verify_run_log(&out, false)?;

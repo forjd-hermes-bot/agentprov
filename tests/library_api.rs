@@ -7,11 +7,12 @@ use tempfile::tempdir;
 
 #[test]
 fn event_input_builds_verifiable_event() {
-    let mut input = EventInput::new("run_library_api", 1, "tool.execute");
-    input.action = Some("http.get".to_owned());
-    input.resource = Some("https://example.com".to_owned());
-    input.subject = Some("agent_library_api".to_owned());
-    input.metadata = Some(json!({"capture": "digest-only"}));
+    let input = EventInput::new("run_library_api", 1, "tool.execute")
+        .action("http.get")
+        .resource("https://example.com")
+        .subject("agent_library_api")
+        .payload_digest("blake3:example-payload")
+        .metadata(json!({"capture": "digest-only"}));
 
     let event = build_event_from_input(input).unwrap();
 
@@ -19,6 +20,7 @@ fn event_input_builds_verifiable_event() {
     assert_eq!(event["run_id"], "run_library_api");
     assert_eq!(event["sequence"], 1);
     assert_eq!(event["subject"]["id"], "agent_library_api");
+    assert_eq!(event["payload_digest"], "blake3:example-payload");
     verify_event_hash(&event).unwrap();
 }
 
@@ -30,14 +32,18 @@ fn append_event_input_appends_and_preserves_chain() {
     let start_hash = start["event_hash"].as_str().unwrap().to_owned();
     write_jsonl(&run, &[start]).unwrap();
 
-    let mut input = AppendEventInput::new("permission.check");
-    input.action = Some("discord.message.create".to_owned());
-    input.resource = Some("discord://guild/123/channel/456".to_owned());
-    input.metadata = Some(json!({"decision": "allow"}));
+    let input = AppendEventInput::new("permission.check")
+        .action("discord.message.create")
+        .resource("discord://guild/123/channel/456")
+        .subject("agent_library_api")
+        .payload_digest("blake3:permission-payload")
+        .metadata(json!({"decision": "allow"}));
 
     let appended = append_event_to_run(&run, input).unwrap();
 
     assert_eq!(appended["sequence"], Value::from(2));
     assert_eq!(appended["previous_event_hash"], start_hash);
+    assert_eq!(appended["subject"]["id"], "agent_library_api");
+    assert_eq!(appended["payload_digest"], "blake3:permission-payload");
     verify_run_log(&run, false).unwrap();
 }
