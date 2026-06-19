@@ -30,6 +30,7 @@ fn collector_ingests_lists_reads_and_verifies_run() {
 
     let runs = store.list_runs().unwrap();
     assert_eq!(runs["runs"][0]["run_id"], "run_collector_test");
+    assert_eq!(runs["runs"][0]["event_count"], 2);
 
     let events = store.run_events("run_collector_test").unwrap();
     assert_eq!(events.len(), 2);
@@ -56,6 +57,7 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     let html = store.dashboard_html().unwrap();
     assert!(html.contains("AgentProv Collector"));
     assert!(html.contains("run_collector_test"));
+    assert!(html.contains("Events: 2"));
     assert!(html.contains("tool.execute"));
     assert!(html.contains("http.get"));
 }
@@ -248,6 +250,7 @@ fn collector_lists_bounded_run_pages() {
     assert_eq!(page["limit"], 2);
     assert_eq!(page["has_more"], true);
     assert_eq!(page["runs"].as_array().unwrap().len(), 2);
+    assert_eq!(page["runs"][0]["event_count"], 1);
 
     let all = store.list_runs().unwrap();
     assert_eq!(all["count"], 3);

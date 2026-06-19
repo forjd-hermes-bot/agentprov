@@ -150,6 +150,7 @@ Status: partial.
 - HTTP JSONL export endpoint for stored runs
 - streaming append endpoint for one verified event at a time
 - optional signature enforcement on streaming append
+- run listings include event counts
 - bounded run listing with `has_more`
 - bounded event listing by stable event sequence
 - event listing filtered by event type

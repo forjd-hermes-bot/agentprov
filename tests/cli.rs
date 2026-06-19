@@ -300,6 +300,7 @@ fn collector_runs_supports_limit() {
     assert_eq!(value["limit"], 1);
     assert_eq!(value["has_more"], true);
     assert_eq!(value["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(value["runs"][0]["event_count"], 1);
 }
 
 #[test]

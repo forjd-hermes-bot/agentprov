@@ -99,7 +99,8 @@ Response:
 
 `GET /runs`
 
-Returns known runs. Optional `limit` returns a bounded page:
+Returns known runs with per-run `event_count` values. Optional `limit` returns a
+bounded page:
 
 ```text
 GET /runs?limit=25

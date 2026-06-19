@@ -253,25 +253,33 @@ impl CollectorStore {
     fn run_rows(&self, limit: Option<i64>) -> Result<Vec<Value>> {
         if let Some(limit) = limit {
             let mut statement = self.connection.prepare(
-                "SELECT run_id, source, created_at FROM runs ORDER BY created_at DESC LIMIT ?1",
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                 FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
+                 GROUP BY runs.run_id, runs.source, runs.created_at \
+                 ORDER BY runs.created_at DESC, runs.run_id ASC LIMIT ?1",
             )?;
             let rows = statement.query_map(params![limit], |row| {
                 Ok(json!({
                     "run_id": row.get::<_, String>(0)?,
                     "source": row.get::<_, Option<String>>(1)?,
                     "created_at": row.get::<_, String>(2)?,
+                    "event_count": row.get::<_, i64>(3)?,
                 }))
             })?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
         } else {
-            let mut statement = self
-                .connection
-                .prepare("SELECT run_id, source, created_at FROM runs ORDER BY created_at DESC")?;
+            let mut statement = self.connection.prepare(
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                 FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
+                 GROUP BY runs.run_id, runs.source, runs.created_at \
+                 ORDER BY runs.created_at DESC, runs.run_id ASC",
+            )?;
             let rows = statement.query_map([], |row| {
                 Ok(json!({
                     "run_id": row.get::<_, String>(0)?,
                     "source": row.get::<_, Option<String>>(1)?,
                     "created_at": row.get::<_, String>(2)?,
+                    "event_count": row.get::<_, i64>(3)?,
                 }))
             })?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -471,8 +479,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
             html.push_str("<section class=\"run\">");
             html.push_str(&format!("<h2>{}</h2>", escape_html(run_id)));
             html.push_str(&format!(
-                "<div class=\"meta\">Source: {} | Created: {}</div>",
+                "<div class=\"meta\">Source: {} | Events: {} | Created: {}</div>",
                 escape_html(run["source"].as_str().unwrap_or("unknown")),
+                run["event_count"].as_i64().unwrap_or_default(),
                 escape_html(run["created_at"].as_str().unwrap_or("unknown"))
             ));
             match self.verify_run(run_id, false) {
@@ -964,6 +973,7 @@ mod tests {
         assert_eq!(value["limit"], 1);
         assert_eq!(value["has_more"], true);
         assert_eq!(value["runs"].as_array().unwrap().len(), 1);
+        assert_eq!(value["runs"][0]["event_count"], 1);
     }
 
     #[test]
