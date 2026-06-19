@@ -246,6 +246,63 @@ fn collector_events_supports_sequence_bounds() {
 }
 
 #[test]
+fn collector_runs_supports_limit() {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("collector.sqlite");
+
+    for name in ["one", "two"] {
+        let run = dir.path().join(format!("{name}.jsonl"));
+        Command::cargo_bin("agentprov")
+            .unwrap()
+            .args([
+                "run",
+                "init",
+                "--agent",
+                "examples/manifest.json",
+                "--trigger",
+                "manual",
+                "--out",
+                run.to_str().unwrap(),
+            ])
+            .assert()
+            .success();
+        Command::cargo_bin("agentprov")
+            .unwrap()
+            .args([
+                "collector",
+                "ingest",
+                run.to_str().unwrap(),
+                "--db",
+                db.to_str().unwrap(),
+            ])
+            .assert()
+            .success();
+    }
+
+    let output = Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "runs",
+            "--db",
+            db.to_str().unwrap(),
+            "--limit",
+            "1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(value["count"], 1);
+    assert_eq!(value["limit"], 1);
+    assert_eq!(value["has_more"], true);
+    assert_eq!(value["runs"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn collector_export_writes_stored_run_as_jsonl() {
     let dir = tempdir().unwrap();
     let run = dir.path().join("run.jsonl");

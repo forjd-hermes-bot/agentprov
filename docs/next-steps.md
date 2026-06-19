@@ -49,6 +49,7 @@ Implemented:
 - local HTTP collector endpoints for JSONL ingest, run listing, event lookup, and
   verification
 - streaming HTTP collector endpoint for verified single-event appends
+- bounded collector run listing with `has_more`
 - bounded collector event listing by event sequence
 - collector event filtering by event type
 - collector event pagination metadata with `has_more`
@@ -86,7 +87,7 @@ agentprov import codex <jsonl-or-> --out <jsonl> [--key <key>]
 agentprov import claude <jsonl-or-> --out <jsonl> [--key <key>]
 agentprov validate <manifest|run-envelope|event|policy> <file>
 agentprov collector ingest <jsonl> --db <db>
-agentprov collector runs --db <db>
+agentprov collector runs --db <db> [--limit <n>]
 agentprov collector events <run_id> --db <db> [--after-sequence <n>] [--limit <n>] [--type <event-type>]
 agentprov collector export <run_id> --db <db> --out <jsonl>
 agentprov collector verify <run_id> --db <db> [--require-signatures]
@@ -227,6 +228,7 @@ Completed:
 - verification endpoint
 - import/export path between JSONL files and stored runs
 - streaming append endpoint for one verified event at a time
+- bounded run listing with `has_more`
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`

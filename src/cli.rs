@@ -1,4 +1,4 @@
-use crate::collector::{CollectorStore, EventListOptions, serve};
+use crate::collector::{CollectorStore, EventListOptions, RunListOptions, serve};
 use crate::event::{build_event, event_hash, verify_event_hash};
 use crate::export::{to_openinference_span, to_otel_span};
 use crate::integrations::{import_claude_jsonl, import_codex_jsonl};
@@ -277,6 +277,8 @@ enum CollectorCommand {
     Runs {
         #[arg(long)]
         db: PathBuf,
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
+        limit: Option<u64>,
     },
     Events {
         run_id: String,
@@ -841,9 +843,9 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
             println!("ingested run {run_id}");
             Ok(())
         }
-        CollectorCommand::Runs { db } => {
+        CollectorCommand::Runs { db, limit } => {
             let store = CollectorStore::open(&db)?;
-            print_json(&store.list_runs()?)
+            print_json(&store.list_runs_json(RunListOptions { limit })?)
         }
         CollectorCommand::Events {
             run_id,

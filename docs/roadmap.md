@@ -146,6 +146,7 @@ Status: partial.
 - query API for runs/events
 - verification endpoint
 - streaming append endpoint for one verified event at a time
+- bounded run listing with `has_more`
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`

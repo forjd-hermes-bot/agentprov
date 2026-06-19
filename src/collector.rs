@@ -15,6 +15,11 @@ pub struct EventListOptions {
     pub event_type: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunListOptions {
+    pub limit: Option<u64>,
+}
+
 pub struct CollectorStore {
     connection: Connection,
 }
@@ -172,22 +177,57 @@ impl CollectorStore {
     }
 
     pub fn list_runs(&self) -> Result<Value> {
-        let runs = self.run_rows()?;
-        Ok(json!({ "runs": runs }))
+        self.list_runs_json(RunListOptions::default())
     }
 
-    fn run_rows(&self) -> Result<Vec<Value>> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT run_id, source, created_at FROM runs ORDER BY created_at DESC")?;
-        let rows = statement.query_map([], |row| {
-            Ok(json!({
-                "run_id": row.get::<_, String>(0)?,
-                "source": row.get::<_, Option<String>>(1)?,
-                "created_at": row.get::<_, String>(2)?,
-            }))
-        })?;
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    pub fn list_runs_json(&self, options: RunListOptions) -> Result<Value> {
+        let mut runs = self.run_rows(options.limit.map(limit_plus_one).transpose()?)?;
+        let has_more = if let Some(limit) = options.limit {
+            let limit_usize = usize::try_from(limit).context("limit is too large for usize")?;
+            if runs.len() > limit_usize {
+                runs.truncate(limit_usize);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let count = runs.len();
+        Ok(json!({
+            "runs": runs,
+            "count": count,
+            "limit": options.limit,
+            "has_more": has_more,
+        }))
+    }
+
+    fn run_rows(&self, limit: Option<i64>) -> Result<Vec<Value>> {
+        if let Some(limit) = limit {
+            let mut statement = self.connection.prepare(
+                "SELECT run_id, source, created_at FROM runs ORDER BY created_at DESC LIMIT ?1",
+            )?;
+            let rows = statement.query_map(params![limit], |row| {
+                Ok(json!({
+                    "run_id": row.get::<_, String>(0)?,
+                    "source": row.get::<_, Option<String>>(1)?,
+                    "created_at": row.get::<_, String>(2)?,
+                }))
+            })?;
+            Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+        } else {
+            let mut statement = self
+                .connection
+                .prepare("SELECT run_id, source, created_at FROM runs ORDER BY created_at DESC")?;
+            let rows = statement.query_map([], |row| {
+                Ok(json!({
+                    "run_id": row.get::<_, String>(0)?,
+                    "source": row.get::<_, Option<String>>(1)?,
+                    "created_at": row.get::<_, String>(2)?,
+                }))
+            })?;
+            Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+        }
     }
 
     pub fn run_events(&self, run_id: &str) -> Result<Vec<Value>> {
@@ -348,7 +388,7 @@ impl CollectorStore {
     }
 
     pub fn dashboard_html(&self) -> Result<String> {
-        let runs = self.run_rows()?;
+        let runs = self.run_rows(None)?;
         let mut html = String::from(
             r#"<!doctype html>
 <html lang="en">
@@ -502,7 +542,7 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
             let report = store.append_event("http-stream", run_id, parse_json_body(body)?)?;
             json_response(200, &report)?
         }
-        ("GET", "/runs") => json_response(200, &store.list_runs()?)?,
+        ("GET", "/runs") => json_response(200, &store.list_runs_json(run_list_options(query)?)?)?,
         ("GET", path) if path.starts_with("/runs/") && path.ends_with("/events") => {
             let run_id = path
                 .trim_start_matches("/runs/")
@@ -596,6 +636,17 @@ fn event_list_options(query: Option<&str>) -> Result<EventListOptions> {
         limit: query_param_u64(query, "limit")?,
         event_type: query_param_string(query, "event_type"),
     })
+}
+
+fn run_list_options(query: Option<&str>) -> Result<RunListOptions> {
+    Ok(RunListOptions {
+        limit: query_param_u64(query, "limit")?,
+    })
+}
+
+fn limit_plus_one(limit: u64) -> Result<i64> {
+    let limit = limit.checked_add(1).context("limit is too large")?;
+    i64::try_from(limit).context("limit is too large for SQLite")
 }
 
 fn query_param_u64(query: Option<&str>, name: &str) -> Result<Option<u64>> {
@@ -735,5 +786,27 @@ mod tests {
         assert_eq!(value["has_more"], false);
         assert_eq!(value["events"][0]["event_type"], "tool.execute");
         assert_eq!(value["next_after_sequence"], 2);
+    }
+
+    #[test]
+    fn http_runs_support_limit() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+        let mut store = CollectorStore::open(&db).unwrap();
+
+        for run_id in ["run_http_one", "run_http_two"] {
+            let start = build_event_from_input(EventInput::new(run_id, 1, "run.start")).unwrap();
+            store.ingest_events("test", &[start]).unwrap();
+        }
+
+        let response =
+            http_response_for_request("GET /runs?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n", &db);
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        let body = response.split("\r\n\r\n").nth(1).unwrap();
+        let value: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(value["count"], 1);
+        assert_eq!(value["limit"], 1);
+        assert_eq!(value["has_more"], true);
+        assert_eq!(value["runs"].as_array().unwrap().len(), 1);
     }
 }

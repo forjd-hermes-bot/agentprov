@@ -1,4 +1,4 @@
-use agentprov::collector::{CollectorStore, EventListOptions};
+use agentprov::collector::{CollectorStore, EventListOptions, RunListOptions};
 use agentprov::event::{EventInput, build_event_from_input, event_hash};
 use agentprov::run_log::{AppendEventInput, append_event_to_run, read_jsonl, write_jsonl};
 use serde_json::json;
@@ -98,6 +98,28 @@ fn collector_appends_streamed_events_and_rejects_invalid_links() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("does not match target run"));
+}
+
+#[test]
+fn collector_lists_bounded_run_pages() {
+    let mut store = CollectorStore::open_memory().unwrap();
+
+    for run_id in ["run_page_one", "run_page_two", "run_page_three"] {
+        let start = build_event_from_input(EventInput::new(run_id, 1, "run.start")).unwrap();
+        store.ingest_events("test", &[start]).unwrap();
+    }
+
+    let page = store
+        .list_runs_json(RunListOptions { limit: Some(2) })
+        .unwrap();
+    assert_eq!(page["count"], 2);
+    assert_eq!(page["limit"], 2);
+    assert_eq!(page["has_more"], true);
+    assert_eq!(page["runs"].as_array().unwrap().len(), 2);
+
+    let all = store.list_runs().unwrap();
+    assert_eq!(all["count"], 3);
+    assert_eq!(all["has_more"], false);
 }
 
 #[test]
