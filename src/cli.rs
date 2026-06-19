@@ -286,6 +286,8 @@ enum CollectorCommand {
         after_sequence: Option<u64>,
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         limit: Option<u64>,
+        #[arg(long = "type")]
+        event_type: Option<String>,
     },
     Export {
         run_id: String,
@@ -848,6 +850,7 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
             db,
             after_sequence,
             limit,
+            event_type,
         } => {
             let store = CollectorStore::open(&db)?;
             print_json(&store.run_events_json(
@@ -855,6 +858,7 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
                 EventListOptions {
                     after_sequence,
                     limit,
+                    event_type,
                 },
             )?)
         }

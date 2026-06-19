@@ -8,10 +8,11 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct EventListOptions {
     pub after_sequence: Option<u64>,
     pub limit: Option<u64>,
+    pub event_type: Option<String>,
 }
 
 pub struct CollectorStore {
@@ -212,22 +213,45 @@ impl CollectorStore {
             .map(i64::try_from)
             .transpose()
             .context("limit is too large for SQLite")?;
-        let event_json = if let Some(limit) = limit {
-            let mut statement = self.connection.prepare(
-                "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 ORDER BY sequence ASC LIMIT ?3",
-            )?;
-            let rows = statement.query_map(params![run_id, after_sequence, limit], |row| {
-                row.get::<_, String>(0)
-            })?;
-            rows.collect::<rusqlite::Result<Vec<_>>>()?
-        } else {
-            let mut statement = self.connection.prepare(
-                "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 ORDER BY sequence ASC",
-            )?;
-            let rows = statement.query_map(params![run_id, after_sequence], |row| {
-                row.get::<_, String>(0)
-            })?;
-            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        let event_json = match (options.event_type.as_deref(), limit) {
+            (Some(event_type), Some(limit)) => {
+                let mut statement = self.connection.prepare(
+                    "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 AND event_type = ?3 ORDER BY sequence ASC LIMIT ?4",
+                )?;
+                let rows = statement
+                    .query_map(params![run_id, after_sequence, event_type, limit], |row| {
+                        row.get::<_, String>(0)
+                    })?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
+            (Some(event_type), None) => {
+                let mut statement = self.connection.prepare(
+                    "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 AND event_type = ?3 ORDER BY sequence ASC",
+                )?;
+                let rows = statement
+                    .query_map(params![run_id, after_sequence, event_type], |row| {
+                        row.get::<_, String>(0)
+                    })?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
+            (None, Some(limit)) => {
+                let mut statement = self.connection.prepare(
+                    "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 ORDER BY sequence ASC LIMIT ?3",
+                )?;
+                let rows = statement.query_map(params![run_id, after_sequence, limit], |row| {
+                    row.get::<_, String>(0)
+                })?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
+            (None, None) => {
+                let mut statement = self.connection.prepare(
+                    "SELECT event_json FROM events WHERE run_id = ?1 AND sequence > ?2 ORDER BY sequence ASC",
+                )?;
+                let rows = statement.query_map(params![run_id, after_sequence], |row| {
+                    row.get::<_, String>(0)
+                })?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
         };
         event_json
             .into_iter()
@@ -257,7 +281,7 @@ impl CollectorStore {
     }
 
     pub fn run_events_json(&self, run_id: &str, options: EventListOptions) -> Result<Value> {
-        let events = self.run_events_page(run_id, options)?;
+        let events = self.run_events_page(run_id, options.clone())?;
         let next_after_sequence = events
             .last()
             .and_then(|event| event.get("sequence"))
@@ -269,6 +293,7 @@ impl CollectorStore {
             "count": count,
             "after_sequence": options.after_sequence,
             "limit": options.limit,
+            "event_type": options.event_type,
             "next_after_sequence": next_after_sequence,
         }))
     }
@@ -531,6 +556,7 @@ fn event_list_options(query: Option<&str>) -> Result<EventListOptions> {
     Ok(EventListOptions {
         after_sequence: query_param_u64(query, "after_sequence")?,
         limit: query_param_u64(query, "limit")?,
+        event_type: query_param_string(query, "event_type"),
     })
 }
 
@@ -551,6 +577,17 @@ fn query_param_u64(query: Option<&str>, name: &str) -> Result<Option<u64>> {
         }
     }
     Ok(None)
+}
+
+fn query_param_string(query: Option<&str>, name: &str) -> Option<String> {
+    let query = query?;
+    for pair in query.split('&') {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if key == name {
+            return Some(value.to_owned());
+        }
+    }
+    None
 }
 
 fn parse_jsonl_body(body: &str) -> Result<Vec<Value>> {
@@ -600,6 +637,7 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{EventInput, build_event_from_input};
     use tempfile::tempdir;
 
     #[test]
@@ -627,5 +665,36 @@ mod tests {
         );
         assert!(bad_json.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(bad_json.contains("\"error\":\"parse body line 1\""));
+    }
+
+    #[test]
+    fn http_events_support_event_type_filter() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+        let mut store = CollectorStore::open(&db).unwrap();
+
+        let start =
+            build_event_from_input(EventInput::new("run_http_filter", 1, "run.start")).unwrap();
+        let mut tool = EventInput::new("run_http_filter", 2, "tool.execute");
+        tool.previous_event_hash = Some(start["event_hash"].as_str().unwrap().to_owned());
+        let tool = build_event_from_input(tool).unwrap();
+        let mut permission = EventInput::new("run_http_filter", 3, "permission.check");
+        permission.previous_event_hash = Some(tool["event_hash"].as_str().unwrap().to_owned());
+        let permission = build_event_from_input(permission).unwrap();
+        store
+            .ingest_events("test", &[start, tool, permission])
+            .unwrap();
+
+        let response = http_response_for_request(
+            "GET /runs/run_http_filter/events?event_type=tool.execute&limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        let body = response.split("\r\n\r\n").nth(1).unwrap();
+        let value: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(value["count"], 1);
+        assert_eq!(value["event_type"], "tool.execute");
+        assert_eq!(value["events"][0]["event_type"], "tool.execute");
+        assert_eq!(value["next_after_sequence"], 2);
     }
 }

@@ -23,6 +23,7 @@ Read events for a run:
 ```bash
 agentprov collector events run_123 --db agentprov.sqlite
 agentprov collector events run_123 --db agentprov.sqlite --after-sequence 100 --limit 50
+agentprov collector events run_123 --db agentprov.sqlite --type permission.check
 ```
 
 Export a stored run back to JSONL:
@@ -87,11 +88,12 @@ Returns known runs.
 
 `GET /runs/<run_id>/events`
 
-Returns stored event JSON for one run. Optional `after_sequence` and `limit`
-query parameters return a bounded page by stable event sequence:
+Returns stored event JSON for one run. Optional `after_sequence`, `limit`, and
+`event_type` query parameters return a bounded, filtered page by stable event
+sequence:
 
 ```text
-GET /runs/run_123/events?after_sequence=100&limit=50
+GET /runs/run_123/events?after_sequence=100&limit=50&event_type=permission.check
 ```
 
 `GET /runs/<run_id>/verify`

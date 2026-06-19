@@ -147,6 +147,7 @@ Status: partial.
 - verification endpoint
 - streaming append endpoint for one verified event at a time
 - bounded event listing by stable event sequence
+- event listing filtered by event type
 - structured JSON error responses for malformed HTTP requests
 
 Future work:

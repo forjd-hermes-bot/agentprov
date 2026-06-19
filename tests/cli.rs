@@ -176,7 +176,10 @@ fn collector_events_supports_sequence_bounds() {
         .assert()
         .success();
 
-    for action in ["tool.first", "tool.second"] {
+    for (event_type, action) in [
+        ("tool.execute", "tool.first"),
+        ("permission.check", "policy.check"),
+    ] {
         Command::cargo_bin("agentprov")
             .unwrap()
             .args([
@@ -185,7 +188,7 @@ fn collector_events_supports_sequence_bounds() {
                 "--run",
                 run.to_str().unwrap(),
                 "--type",
-                "tool.execute",
+                event_type,
                 "--action",
                 action,
             ])
@@ -221,6 +224,8 @@ fn collector_events_supports_sequence_bounds() {
             "1",
             "--limit",
             "1",
+            "--type",
+            "tool.execute",
         ])
         .assert()
         .success()
@@ -232,8 +237,10 @@ fn collector_events_supports_sequence_bounds() {
     assert_eq!(value["count"], 1);
     assert_eq!(value["after_sequence"], 1);
     assert_eq!(value["limit"], 1);
+    assert_eq!(value["event_type"], "tool.execute");
     assert_eq!(value["next_after_sequence"], 2);
     assert_eq!(value["events"][0]["sequence"], 2);
+    assert_eq!(value["events"][0]["event_type"], "tool.execute");
     assert_eq!(value["events"][0]["action"], "tool.first");
 }
 
