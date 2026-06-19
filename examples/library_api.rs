@@ -1,7 +1,4 @@
-use agentprov::{
-    AppendEventInput, EventInput, append_event_to_run, build_event_from_input, verify_run_log,
-    write_jsonl,
-};
+use agentprov::{AppendEventInput, EventInput, append_event_to_run, init_run_log, verify_run_log};
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -20,7 +17,7 @@ fn main() -> anyhow::Result<()> {
             "integration": "rust-library",
             "capture": "digest-only"
         }));
-    write_jsonl(&out, &[build_event_from_input(start)?])?;
+    init_run_log(&out, start)?;
 
     let tool = AppendEventInput::new("tool.execute")
         .action("example.lookup")

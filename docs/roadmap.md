@@ -90,6 +90,7 @@ Status: partial.
 
 - typed Rust event and run-log append inputs
 - fluent setters for common Rust event input fields
+- Rust helper for initializing a run log with its first event
 - stable Rust functions for event hashing, run-log verification, signing,
   signature verification, and policy checks
 - top-level Rust crate exports for common embedding primitives

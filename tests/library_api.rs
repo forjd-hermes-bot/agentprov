@@ -1,6 +1,6 @@
 use agentprov::{
-    AppendEventInput, EventInput, append_event_to_run, build_event_from_input, verify_event_hash,
-    verify_run_log, write_jsonl,
+    AppendEventInput, EventInput, append_event_to_run, build_event_from_input, init_run_log,
+    read_jsonl, verify_event_hash, verify_run_log,
 };
 use serde_json::{Value, json};
 use tempfile::tempdir;
@@ -28,9 +28,8 @@ fn event_input_builds_verifiable_event() {
 fn append_event_input_appends_and_preserves_chain() {
     let dir = tempdir().unwrap();
     let run = dir.path().join("run.jsonl");
-    let start = build_event_from_input(EventInput::new("run_library_api", 1, "run.start")).unwrap();
+    let start = init_run_log(&run, EventInput::new("run_library_api", 1, "run.start")).unwrap();
     let start_hash = start["event_hash"].as_str().unwrap().to_owned();
-    write_jsonl(&run, &[start]).unwrap();
 
     let input = AppendEventInput::new("permission.check")
         .action("discord.message.create")
@@ -46,4 +45,39 @@ fn append_event_input_appends_and_preserves_chain() {
     assert_eq!(appended["subject"]["id"], "agent_library_api");
     assert_eq!(appended["payload_digest"], "blake3:permission-payload");
     verify_run_log(&run, false).unwrap();
+}
+
+#[test]
+fn init_run_log_writes_one_valid_initial_event() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+
+    let event = init_run_log(
+        &run,
+        EventInput::new("run_library_api_init", 1, "run.start")
+            .action("trigger.api")
+            .resource("example://library-api"),
+    )
+    .unwrap();
+
+    assert_eq!(event["sequence"], 1);
+    let events = read_jsonl(&run).unwrap();
+    assert_eq!(events, vec![event]);
+    verify_run_log(&run, false).unwrap();
+}
+
+#[test]
+fn init_run_log_rejects_non_initial_events() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+
+    let error = init_run_log(
+        &run,
+        EventInput::new("run_library_api_bad_init", 2, "run.start"),
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("event sequence mismatch: expected 1, actual 2"));
+    assert!(!run.exists());
 }

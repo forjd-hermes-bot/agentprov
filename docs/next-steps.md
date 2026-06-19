@@ -45,6 +45,7 @@ Implemented:
 - typed Rust inputs for event construction and run-log appending
 - fluent setters for Rust event input structs
 - top-level Rust crate exports for common embedding primitives
+- Rust API helper for initializing a run log with its first event
 - library-level Rust example for embedding AgentProv primitives
 - deterministic OpenAI-style, Anthropic-style, LiteLLM-style, GitHub tool,
   Discord tool, and scheduled-run Rust examples
@@ -214,6 +215,7 @@ Completed:
   signing, verifying signatures, and policy checks
 - add fluent setters for common Rust event input fields
 - expose common Rust embedding primitives at the crate root
+- add a Rust helper for initializing a run log with its first event
 - add a minimal library-level Rust example
 
 Future API work:

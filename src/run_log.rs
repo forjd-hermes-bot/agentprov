@@ -96,6 +96,13 @@ pub fn append_jsonl(path: &Path, value: &Value) -> Result<()> {
     Ok(())
 }
 
+pub fn init_run_log(path: &Path, input: EventInput) -> Result<Value> {
+    let event = build_event_from_input(input)?;
+    verify_events(std::slice::from_ref(&event), false)?;
+    write_jsonl(path, std::slice::from_ref(&event))?;
+    Ok(event)
+}
+
 pub fn next_event_for_run(path: &Path, input: AppendEventInput) -> Result<Value> {
     let events = read_jsonl(path)?;
     let last = events
