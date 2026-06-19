@@ -287,6 +287,13 @@ enum CollectorCommand {
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         limit: Option<u64>,
     },
+    Export {
+        run_id: String,
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
     Verify {
         run_id: String,
         #[arg(long)]
@@ -850,6 +857,12 @@ fn handle_collector(command: CollectorCommand) -> Result<()> {
                     limit,
                 },
             )?)
+        }
+        CollectorCommand::Export { run_id, db, out } => {
+            let store = CollectorStore::open(&db)?;
+            let events = store.export_jsonl_file(&run_id, &out)?;
+            println!("exported {events} events to {}", out.display());
+            Ok(())
         }
         CollectorCommand::Verify {
             run_id,

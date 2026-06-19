@@ -86,6 +86,7 @@ agentprov validate <manifest|run-envelope|event|policy> <file>
 agentprov collector ingest <jsonl> --db <db>
 agentprov collector runs --db <db>
 agentprov collector events <run_id> --db <db> [--after-sequence <n>] [--limit <n>]
+agentprov collector export <run_id> --db <db> --out <jsonl>
 agentprov collector verify <run_id> --db <db> [--require-signatures]
 agentprov collector ui --db <db> --out <html>
 agentprov collector serve --addr <addr> --db <db>

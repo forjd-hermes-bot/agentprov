@@ -1,6 +1,6 @@
 use agentprov::collector::{CollectorStore, EventListOptions};
 use agentprov::event::{EventInput, build_event_from_input, event_hash};
-use agentprov::run_log::{AppendEventInput, append_event_to_run, write_jsonl};
+use agentprov::run_log::{AppendEventInput, append_event_to_run, read_jsonl, write_jsonl};
 use serde_json::json;
 use tempfile::tempdir;
 
@@ -35,6 +35,13 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     let report = store.verify_run("run_collector_test", false).unwrap();
     assert_eq!(report["verifies"], true);
     assert_eq!(report["events"], 2);
+
+    let exported = dir.path().join("exported.jsonl");
+    let exported_count = store
+        .export_jsonl_file("run_collector_test", &exported)
+        .unwrap();
+    assert_eq!(exported_count, 2);
+    assert_eq!(read_jsonl(&exported).unwrap(), read_jsonl(&run).unwrap());
 
     let html = store.dashboard_html().unwrap();
     assert!(html.contains("AgentProv Collector"));

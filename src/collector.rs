@@ -1,4 +1,4 @@
-use crate::run_log::{read_jsonl, verify_events};
+use crate::run_log::{read_jsonl, verify_events, write_jsonl};
 use anyhow::{Context, Result, bail};
 use chrono::Utc;
 use rusqlite::{Connection, params};
@@ -161,6 +161,13 @@ impl CollectorStore {
     pub fn ingest_jsonl_file(&mut self, path: &Path) -> Result<String> {
         let events = read_jsonl(path)?;
         self.ingest_events(&path.display().to_string(), &events)
+    }
+
+    pub fn export_jsonl_file(&self, run_id: &str, path: &Path) -> Result<usize> {
+        let events = self.run_events(run_id)?;
+        let count = events.len();
+        write_jsonl(path, &events)?;
+        Ok(count)
     }
 
     pub fn list_runs(&self) -> Result<Value> {

@@ -25,6 +25,12 @@ agentprov collector events run_123 --db agentprov.sqlite
 agentprov collector events run_123 --db agentprov.sqlite --after-sequence 100 --limit 50
 ```
 
+Export a stored run back to JSONL:
+
+```bash
+agentprov collector export run_123 --db agentprov.sqlite --out restored-run.jsonl
+```
+
 Verify a stored run:
 
 ```bash

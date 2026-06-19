@@ -238,6 +238,82 @@ fn collector_events_supports_sequence_bounds() {
 }
 
 #[test]
+fn collector_export_writes_stored_run_as_jsonl() {
+    let dir = tempdir().unwrap();
+    let run = dir.path().join("run.jsonl");
+    let db = dir.path().join("collector.sqlite");
+    let exported = dir.path().join("exported.jsonl");
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "run",
+            "init",
+            "--agent",
+            "examples/manifest.json",
+            "--trigger",
+            "manual",
+            "--out",
+            run.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "event",
+            "append",
+            "--run",
+            run.to_str().unwrap(),
+            "--type",
+            "tool.execute",
+            "--action",
+            "http.get",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "ingest",
+            run.to_str().unwrap(),
+            "--db",
+            db.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let run_id = read_jsonl_fixture(&run)[0]["run_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args([
+            "collector",
+            "export",
+            &run_id,
+            "--db",
+            db.to_str().unwrap(),
+            "--out",
+            exported.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("exported 2 events"));
+
+    assert_eq!(read_jsonl_fixture(&exported), read_jsonl_fixture(&run));
+    Command::cargo_bin("agentprov")
+        .unwrap()
+        .args(["run", "verify", exported.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Events: 2"));
+}
+
+#[test]
 fn run_verify_rejects_tampered_log() {
     let dir = tempdir().unwrap();
     let run = dir.path().join("run.jsonl");
