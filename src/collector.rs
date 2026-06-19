@@ -575,7 +575,10 @@ fn route_http_request(request: &str, db: &Path) -> Result<String> {
                 .trim_start_matches("/runs/")
                 .trim_end_matches("/verify")
                 .trim_end_matches('/');
-            json_response(200, &store.verify_run(run_id, false)?)?
+            json_response(
+                200,
+                &store.verify_run(run_id, verify_require_signatures(query)?)?,
+            )?
         }
         _ => json_response(404, &json!({"error": "not found"}))?,
     };
@@ -602,6 +605,7 @@ fn is_bad_request_error(message: &str) -> bool {
         || message.contains(" mismatch")
         || message.contains(" does not match ")
         || message.contains(" has no ")
+        || message.starts_with("missing signature")
         || message.contains("schema validation failed")
         || message.contains("event hash mismatch")
 }
@@ -661,6 +665,10 @@ fn run_list_options(query: Option<&str>) -> Result<RunListOptions> {
     })
 }
 
+fn verify_require_signatures(query: Option<&str>) -> Result<bool> {
+    Ok(query_param_bool(query, "require_signatures")?.unwrap_or(false))
+}
+
 fn limit_plus_one(limit: u64) -> Result<i64> {
     let limit = limit.checked_add(1).context("limit is too large")?;
     i64::try_from(limit).context("limit is too large for SQLite")
@@ -680,6 +688,23 @@ fn query_param_u64(query: Option<&str>, name: &str) -> Result<Option<u64>> {
                 bail!("limit must be greater than 0");
             }
             return Ok(Some(parsed));
+        }
+    }
+    Ok(None)
+}
+
+fn query_param_bool(query: Option<&str>, name: &str) -> Result<Option<bool>> {
+    let Some(query) = query else {
+        return Ok(None);
+    };
+    for pair in query.split('&') {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if key == name {
+            return match value {
+                "true" => Ok(Some(true)),
+                "false" => Ok(Some(false)),
+                _ => bail!("{name} must be true or false"),
+            };
         }
     }
     Ok(None)
@@ -783,6 +808,13 @@ mod tests {
         );
         assert!(bad_json.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(bad_json.contains("\"error\":\"parse body line 1\""));
+
+        let bad_boolean = http_response_for_request(
+            "GET /runs/run_missing/verify?require_signatures=yes HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(bad_boolean.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(bad_boolean.contains("\"error\":\"require_signatures must be true or false\""));
     }
 
     #[test]
@@ -867,5 +899,33 @@ mod tests {
             .map(|line| serde_json::from_str::<Value>(line).unwrap())
             .collect::<Vec<_>>();
         assert_eq!(exported, vec![start, tool]);
+    }
+
+    #[test]
+    fn http_verify_can_require_signatures() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("collector.sqlite");
+        let mut store = CollectorStore::open(&db).unwrap();
+
+        let start =
+            build_event_from_input(EventInput::new("run_http_verify", 1, "run.start")).unwrap();
+        store.ingest_events("test", &[start]).unwrap();
+
+        let lenient = http_response_for_request(
+            "GET /runs/run_http_verify/verify HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(lenient.starts_with("HTTP/1.1 200 OK"));
+        let body = lenient.split("\r\n\r\n").nth(1).unwrap();
+        let value: Value = serde_json::from_str(body).unwrap();
+        assert_eq!(value["verifies"], true);
+        assert_eq!(value["signatures"], "not present");
+
+        let strict = http_response_for_request(
+            "GET /runs/run_http_verify/verify?require_signatures=true HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            &db,
+        );
+        assert!(strict.starts_with("HTTP/1.1 400 Bad Request"));
+        assert!(strict.contains("\"error\":\"missing signature at sequence 1\""));
     }
 }

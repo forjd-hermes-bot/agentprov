@@ -53,6 +53,7 @@ Implemented:
 - bounded collector event listing by event sequence
 - collector event filtering by event type
 - collector event pagination metadata with `has_more`
+- HTTP collector verification with optional signature enforcement
 - structured JSON errors for collector HTTP requests
 - static read-only collector dashboard export
 - trust semantics note for local signatures, manifest binding, run envelopes, and
@@ -233,6 +234,7 @@ Completed:
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`
+- HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
 
 Future production work:

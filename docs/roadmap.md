@@ -151,6 +151,7 @@ Status: partial.
 - bounded event listing by stable event sequence
 - event listing filtered by event type
 - pagination metadata with `has_more`
+- HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
 
 Future work:

@@ -113,7 +113,12 @@ Returns the stored run as AgentProv JSONL with
 
 `GET /runs/<run_id>/verify`
 
-Runs event-chain verification for one stored run.
+Runs event-chain verification for one stored run. Optional
+`require_signatures=true` rejects any unsigned event:
+
+```text
+GET /runs/run_123/verify?require_signatures=true
+```
 
 ## HTTP errors
 
