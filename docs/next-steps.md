@@ -53,6 +53,7 @@ Implemented:
 - streaming HTTP collector endpoint for verified single-event appends
 - streaming append can require event signatures
 - collector run listings include event counts
+- collector run listings and summaries include chain-tip metadata
 - collector run summaries include event-type counts
 - direct collector event lookup by sequence
 - bounded collector run listing with `has_more`
@@ -242,6 +243,7 @@ Completed:
 - streaming append endpoint for one verified event at a time
 - optional signature enforcement on streaming append
 - collector run listings include event counts
+- collector run listings and summaries include chain-tip metadata
 - collector run summaries include event-type counts
 - direct event lookup by stable sequence
 - bounded run listing with `has_more`

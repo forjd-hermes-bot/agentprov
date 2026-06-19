@@ -31,10 +31,24 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     let runs = store.list_runs().unwrap();
     assert_eq!(runs["runs"][0]["run_id"], "run_collector_test");
     assert_eq!(runs["runs"][0]["event_count"], 2);
+    assert_eq!(runs["runs"][0]["last_sequence"], 2);
+    assert!(
+        runs["runs"][0]["last_event_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("blake3:")
+    );
 
     let summary = store.run_summary_json("run_collector_test").unwrap();
     assert_eq!(summary["run_id"], "run_collector_test");
     assert_eq!(summary["event_count"], 2);
+    assert_eq!(summary["last_sequence"], 2);
+    assert!(
+        summary["last_event_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("blake3:")
+    );
     let event_types = summary["event_types"].as_array().unwrap();
     assert!(
         event_types
@@ -82,6 +96,7 @@ fn collector_ingests_lists_reads_and_verifies_run() {
     assert!(html.contains("AgentProv Collector"));
     assert!(html.contains("run_collector_test"));
     assert!(html.contains("Events: 2"));
+    assert!(html.contains("Last sequence: 2"));
     assert!(html.contains("tool.execute"));
     assert!(html.contains("http.get"));
 }
@@ -275,6 +290,7 @@ fn collector_lists_bounded_run_pages() {
     assert_eq!(page["has_more"], true);
     assert_eq!(page["runs"].as_array().unwrap().len(), 2);
     assert_eq!(page["runs"][0]["event_count"], 1);
+    assert_eq!(page["runs"][0]["last_sequence"], 1);
 
     let all = store.list_runs().unwrap();
     assert_eq!(all["count"], 3);

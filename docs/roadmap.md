@@ -151,6 +151,7 @@ Status: partial.
 - streaming append endpoint for one verified event at a time
 - optional signature enforcement on streaming append
 - run listings include event counts
+- run listings and summaries include chain-tip metadata
 - run summaries include event-type counts
 - direct event lookup by stable sequence
 - bounded run listing with `has_more`

@@ -373,6 +373,13 @@ fn collector_runs_supports_limit() {
     assert_eq!(value["has_more"], true);
     assert_eq!(value["runs"].as_array().unwrap().len(), 1);
     assert_eq!(value["runs"][0]["event_count"], 1);
+    assert_eq!(value["runs"][0]["last_sequence"], 1);
+    assert!(
+        value["runs"][0]["last_event_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("blake3:")
+    );
 }
 
 #[test]
@@ -437,6 +444,13 @@ fn collector_run_prints_summary() {
     let value: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(value["run_id"], run_id.as_str());
     assert_eq!(value["event_count"], 2);
+    assert_eq!(value["last_sequence"], 2);
+    assert!(
+        value["last_event_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("blake3:")
+    );
     assert!(
         value["event_types"]
             .as_array()

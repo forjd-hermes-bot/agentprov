@@ -106,8 +106,8 @@ Response:
 
 `GET /runs`
 
-Returns known runs with per-run `event_count` values. Optional `limit` returns a
-bounded page:
+Returns known runs with per-run `event_count`, `last_sequence`, and
+`last_event_hash` values. Optional `limit` returns a bounded page:
 
 ```text
 GET /runs?limit=25
@@ -117,7 +117,8 @@ Responses include `count`, `limit`, and `has_more` metadata.
 
 `GET /runs/<run_id>`
 
-Returns one run summary with `event_count` and per-`event_type` counts:
+Returns one run summary with `event_count`, chain-tip metadata, and
+per-`event_type` counts:
 
 ```text
 GET /runs/run_123

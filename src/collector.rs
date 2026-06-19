@@ -254,7 +254,9 @@ impl CollectorStore {
         let mut summary = self
             .connection
             .query_row(
-                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence), \
+                    MAX(events.sequence), \
+                    (SELECT tip.event_hash FROM events tip WHERE tip.run_id = runs.run_id ORDER BY tip.sequence DESC LIMIT 1) \
                  FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
                  WHERE runs.run_id = ?1 \
                  GROUP BY runs.run_id, runs.source, runs.created_at",
@@ -265,6 +267,8 @@ impl CollectorStore {
                         "source": row.get::<_, Option<String>>(1)?,
                         "created_at": row.get::<_, String>(2)?,
                         "event_count": row.get::<_, i64>(3)?,
+                        "last_sequence": row.get::<_, Option<i64>>(4)?,
+                        "last_event_hash": row.get::<_, Option<String>>(5)?,
                     }))
                 },
             )
@@ -277,7 +281,9 @@ impl CollectorStore {
     fn run_rows(&self, limit: Option<i64>) -> Result<Vec<Value>> {
         if let Some(limit) = limit {
             let mut statement = self.connection.prepare(
-                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence), \
+                    MAX(events.sequence), \
+                    (SELECT tip.event_hash FROM events tip WHERE tip.run_id = runs.run_id ORDER BY tip.sequence DESC LIMIT 1) \
                  FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
                  GROUP BY runs.run_id, runs.source, runs.created_at \
                  ORDER BY runs.created_at DESC, runs.run_id ASC LIMIT ?1",
@@ -288,12 +294,16 @@ impl CollectorStore {
                     "source": row.get::<_, Option<String>>(1)?,
                     "created_at": row.get::<_, String>(2)?,
                     "event_count": row.get::<_, i64>(3)?,
+                    "last_sequence": row.get::<_, Option<i64>>(4)?,
+                    "last_event_hash": row.get::<_, Option<String>>(5)?,
                 }))
             })?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
         } else {
             let mut statement = self.connection.prepare(
-                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence) \
+                "SELECT runs.run_id, runs.source, runs.created_at, COUNT(events.sequence), \
+                    MAX(events.sequence), \
+                    (SELECT tip.event_hash FROM events tip WHERE tip.run_id = runs.run_id ORDER BY tip.sequence DESC LIMIT 1) \
                  FROM runs LEFT JOIN events ON events.run_id = runs.run_id \
                  GROUP BY runs.run_id, runs.source, runs.created_at \
                  ORDER BY runs.created_at DESC, runs.run_id ASC",
@@ -304,6 +314,8 @@ impl CollectorStore {
                     "source": row.get::<_, Option<String>>(1)?,
                     "created_at": row.get::<_, String>(2)?,
                     "event_count": row.get::<_, i64>(3)?,
+                    "last_sequence": row.get::<_, Option<i64>>(4)?,
+                    "last_event_hash": row.get::<_, Option<String>>(5)?,
                 }))
             })?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -534,9 +546,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
             html.push_str("<section class=\"run\">");
             html.push_str(&format!("<h2>{}</h2>", escape_html(run_id)));
             html.push_str(&format!(
-                "<div class=\"meta\">Source: {} | Events: {} | Created: {}</div>",
+                "<div class=\"meta\">Source: {} | Events: {} | Last sequence: {} | Created: {}</div>",
                 escape_html(run["source"].as_str().unwrap_or("unknown")),
                 run["event_count"].as_i64().unwrap_or_default(),
+                run["last_sequence"].as_i64().unwrap_or_default(),
                 escape_html(run["created_at"].as_str().unwrap_or("unknown"))
             ));
             match self.verify_run(run_id, false) {
@@ -1034,6 +1047,13 @@ mod tests {
         let summary: Value = serde_json::from_str(body).unwrap();
         assert_eq!(summary["run_id"], "run_http_filter");
         assert_eq!(summary["event_count"], 3);
+        assert_eq!(summary["last_sequence"], 3);
+        assert!(
+            summary["last_event_hash"]
+                .as_str()
+                .unwrap()
+                .starts_with("blake3:")
+        );
         assert!(summary["event_types"].as_array().unwrap().iter().any(
             |event_type| event_type["event_type"] == "tool.execute" && event_type["count"] == 1
         ));
@@ -1092,6 +1112,13 @@ mod tests {
         assert_eq!(value["has_more"], true);
         assert_eq!(value["runs"].as_array().unwrap().len(), 1);
         assert_eq!(value["runs"][0]["event_count"], 1);
+        assert_eq!(value["runs"][0]["last_sequence"], 1);
+        assert!(
+            value["runs"][0]["last_event_hash"]
+                .as_str()
+                .unwrap()
+                .starts_with("blake3:")
+        );
     }
 
     #[test]
