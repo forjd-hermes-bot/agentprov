@@ -71,6 +71,10 @@ impl CollectorStore {
                 PRIMARY KEY (run_id, sequence),
                 FOREIGN KEY (run_id) REFERENCES runs(run_id)
             );
+            CREATE INDEX IF NOT EXISTS idx_collector_runs_created_at_run_id
+                ON runs(created_at DESC, run_id ASC);
+            CREATE INDEX IF NOT EXISTS idx_collector_events_run_type_sequence
+                ON events(run_id, event_type, sequence);
             "#,
         )?;
         Ok(())
@@ -948,6 +952,35 @@ mod tests {
     use crate::event::{EventInput, build_event_from_input};
     use crate::signing::{generate_key, sign_value};
     use tempfile::tempdir;
+
+    #[test]
+    fn collector_initializes_query_indexes() {
+        let store = CollectorStore::open_memory().unwrap();
+
+        let mut statement = store
+            .connection
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'index' \
+                 AND name IN (
+                    'idx_collector_runs_created_at_run_id',
+                    'idx_collector_events_run_type_sequence'
+                 ) ORDER BY name ASC",
+            )
+            .unwrap();
+        let indexes = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+
+        assert_eq!(
+            indexes,
+            vec![
+                "idx_collector_events_run_type_sequence",
+                "idx_collector_runs_created_at_run_id",
+            ]
+        );
+    }
 
     #[test]
     fn http_healthz_reports_ok() {

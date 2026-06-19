@@ -5,6 +5,10 @@ logs. It stores original event JSON in SQLite and verifies stored runs with the
 same event-chain verifier used by `agentprov run verify`. Bulk ingest rejects
 run logs whose event chain does not verify.
 
+The SQLite store initializes secondary indexes for run listing order and
+event-type filtered event pages. The primary `(run_id, sequence)` key remains
+the stable lookup path for direct event reads and unfiltered event pages.
+
 ## CLI
 
 Ingest a run log:

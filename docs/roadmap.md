@@ -161,11 +161,11 @@ Status: partial.
 - HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
 - collector health check endpoint
+- SQLite indexes for collector run listing and event filtering
 
 Future work:
 
 - authentication and transport security design
-- larger-run query ergonomics
 - Postgres persistence option if needed
 
 ## Phase 9: UI

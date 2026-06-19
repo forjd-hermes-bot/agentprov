@@ -63,6 +63,7 @@ Implemented:
 - HTTP collector verification with optional signature enforcement
 - structured JSON errors for collector HTTP requests
 - collector health check endpoint
+- SQLite indexes for collector run listing and event filtering
 - static read-only collector dashboard export
 - trust semantics note for local signatures, manifest binding, run envelopes, and
   future trust roots
@@ -254,11 +255,11 @@ Completed:
 - HTTP verification with optional signature enforcement
 - structured JSON error responses for malformed HTTP requests
 - collector health check endpoint
+- SQLite indexes for collector run listing and event filtering
 
 Future production work:
 
 - authentication and transport security design
-- larger-run query ergonomics
 - Postgres persistence option if needed
 
 ## Milestone 8: Read-only UI
